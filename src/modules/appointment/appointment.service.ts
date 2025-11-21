@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { GoogleMeetService } from '../integration/google-meet.service';
+import { WebSocketGatewayService } from '../websocket/websocket.gateway';
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
 import { UpdateAppointmentDto } from './dto/update-appointment.dto';
 
@@ -9,6 +10,7 @@ export class AppointmentService {
   constructor(
     private prisma: PrismaService,
     private googleMeetService: GoogleMeetService,
+    private websocketGateway: WebSocketGatewayService,
   ) {}
 
   async create(createAppointmentDto: CreateAppointmentDto) {
@@ -18,7 +20,7 @@ export class AppointmentService {
       duration: createAppointmentDto.duration || 30,
     });
 
-    return this.prisma.appointment.create({
+    const appointment = await this.prisma.appointment.create({
       data: {
         ...createAppointmentDto,
         meetLink,
@@ -28,6 +30,21 @@ export class AppointmentService {
         doctor: { include: { user: { include: { profile: true } } } },
       },
     });
+
+    // Broadcast appointment scheduled event
+    this.websocketGateway.broadcastAppointmentScheduled({
+      appointmentId: appointment.id,
+      patientId: appointment.patientId,
+      doctorId: appointment.doctorId,
+      patientName: `${appointment.patient.user.profile?.firstName} ${appointment.patient.user.profile?.lastName}`,
+      doctorName: `Dr. ${appointment.doctor.user.profile?.firstName} ${appointment.doctor.user.profile?.lastName}`,
+      scheduledAt: appointment.scheduledAt,
+      duration: appointment.duration,
+      meetLink: appointment.meetLink,
+      status: appointment.status,
+    });
+
+    return appointment;
   }
 
   async findAll() {
@@ -51,7 +68,7 @@ export class AppointmentService {
   }
 
   async update(id: string, updateAppointmentDto: UpdateAppointmentDto) {
-    return this.prisma.appointment.update({
+    const appointment = await this.prisma.appointment.update({
       where: { id },
       data: updateAppointmentDto,
       include: {
@@ -59,6 +76,31 @@ export class AppointmentService {
         doctor: { include: { user: { include: { profile: true } } } },
       },
     });
+
+    // Broadcast appointment update
+    this.websocketGateway.sendToUser(appointment.patient.userId, 'appointment:updated', {
+      type: 'APPOINTMENT_UPDATED',
+      data: {
+        appointmentId: appointment.id,
+        status: appointment.status,
+        scheduledAt: appointment.scheduledAt,
+        notes: appointment.notes,
+      },
+      timestamp: new Date().toISOString(),
+    });
+
+    this.websocketGateway.sendToUser(appointment.doctor.userId, 'appointment:updated', {
+      type: 'APPOINTMENT_UPDATED', 
+      data: {
+        appointmentId: appointment.id,
+        status: appointment.status,
+        scheduledAt: appointment.scheduledAt,
+        notes: appointment.notes,
+      },
+      timestamp: new Date().toISOString(),
+    });
+
+    return appointment;
   }
 
   async getUpcomingAppointments(userId: string, role: string) {

@@ -151,11 +151,14 @@ export class PatientService {
       return { user, patient, tempPassword };
     });
 
-    // Emit WebSocket event
-    this.websocketGateway.emitNewPatientRegistered({
+    // Broadcast WebSocket event
+    this.websocketGateway.broadcastNewPatientRegistration({
       patientId: result.patient.id,
+      patientNumber: result.patient.patientId,
       name,
       email,
+      age,
+      gender,
       registeredAt: new Date(),
     });
 
