@@ -1,0 +1,385 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  PATIENT
+  DOCTOR
+  JUNIOR_DOCTOR
+  NURSE
+  CEO
+  CTO
+  CFO
+  CMO
+  ADMIN
+}
+
+enum AppointmentStatus {
+  SCHEDULED
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+  RESCHEDULED
+}
+
+enum VitalType {
+  BLOOD_PRESSURE
+  HEART_RATE
+  OXYGEN_SATURATION
+  BLOOD_SUGAR
+  TEMPERATURE
+  WEIGHT
+  HEIGHT
+  BMI
+  RESPIRATORY_RATE
+}
+
+enum NotificationType {
+  APPOINTMENT_REMINDER
+  PRESCRIPTION_READY
+  VITAL_ALERT
+  SYSTEM_ALERT
+  GENERAL
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  DELIVERED
+  FAILED
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+  PREFER_NOT_TO_SAY
+}
+
+enum PatientStatus {
+  UNASSIGNED
+  ASSIGNED
+  ACTIVE
+  INACTIVE
+  DISCHARGED
+}
+
+enum PrescriptionStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
+  EXPIRED
+}
+
+model User {
+  id               String    @id @default(cuid())
+  email            String    @unique
+  password         String
+  role             UserRole
+  isActive         Boolean   @default(true)
+  isDeleted        Boolean   @default(false)
+  refreshToken     String?
+  resetToken       String?
+  resetTokenExpiry DateTime?
+  lastLoginAt      DateTime?
+  emailVerifiedAt  DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  deletedAt        DateTime?
+
+  profile       Profile?
+  patient       Patient?
+  doctor        Doctor?
+  officer       Officer?
+  logs          AuditLog[]
+  notifications Notification[]
+  roles         UserRoleAssignment[]
+
+  @@map("users")
+}
+
+model Profile {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  firstName   String
+  lastName    String
+  phone       String?
+  avatar      String?
+  dateOfBirth DateTime?
+  gender      Gender?
+  address     String?
+  city        String?
+  state       String?
+  zipCode     String?
+  country     String   @default("US")
+  isDeleted   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("profiles")
+}
+
+model Patient {
+  id                String        @id @default(cuid())
+  userId            String        @unique
+  patientId         String        @unique
+  emergencyContact  String?
+  emergencyPhone    String?
+  bloodGroup        String?
+  allergies         String?
+  chronicConditions String?
+  insuranceNumber   String?
+  insuranceProvider String?
+  status            PatientStatus @default(UNASSIGNED)
+  isDeleted         Boolean       @default(false)
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  deletedAt         DateTime?
+
+  user            User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  appointments    Appointment[]
+  vitals          Vital[]
+  medicalHistory  MedicalHistory[]
+  prescriptions   Prescription[]
+  assignedDoctors DoctorPatientAssignment[]
+
+  @@map("patients")
+}
+
+model Doctor {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  doctorId        String   @unique
+  specialization  String
+  licenseNumber   String   @unique
+  experience      Int
+  consultationFee Float
+  qualification   String?
+  hospital        String?
+  isAvailable     Boolean  @default(true)
+  isDeleted       Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  deletedAt       DateTime?
+
+  user             User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  appointments     Appointment[]
+  prescriptions    Prescription[]
+  assignedPatients DoctorPatientAssignment[]
+  vitalsRecorded   Vital[]                   @relation("VitalRecordedBy")
+
+  @@map("doctors")
+}
+
+model Officer {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  officerId   String   @unique
+  department  String
+  position    String?
+  permissions String[]
+  isDeleted   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("officers")
+}
+
+model DoctorPatientAssignment {
+  id         String    @id @default(cuid())
+  doctorId   String
+  patientId  String
+  assignedBy String?
+  assignedAt DateTime  @default(now())
+  unassignedAt DateTime?
+  isActive   Boolean   @default(true)
+  isDeleted  Boolean   @default(false)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  deletedAt  DateTime?
+
+  doctor  Doctor  @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@unique([doctorId, patientId])
+  @@map("doctor_patient_assignments")
+}
+
+model Appointment {
+  id            String            @id @default(cuid())
+  patientId     String
+  doctorId      String
+  scheduledAt   DateTime
+  completedAt   DateTime?
+  duration      Int               @default(30)
+  status        AppointmentStatus @default(SCHEDULED)
+  meetLink      String?
+  notes         String?
+  diagnosis     String?
+  followUpDate  DateTime?
+  cancelReason  String?
+  isDeleted     Boolean           @default(false)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  deletedAt     DateTime?
+
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  doctor  Doctor  @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+
+  @@map("appointments")
+}
+
+model Vital {
+  id         String    @id @default(cuid())
+  patientId  String
+  doctorId   String?
+  type       VitalType
+  value      String
+  unit       String
+  recordedBy String
+  recordedAt DateTime  @default(now())
+  notes      String?
+  isDeleted  Boolean   @default(false)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  deletedAt  DateTime?
+
+  patient        Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  recordedByUser Doctor? @relation("VitalRecordedBy", fields: [doctorId], references: [id])
+
+  @@map("vitals")
+}
+
+model MedicalHistory {
+  id          String    @id @default(cuid())
+  patientId   String
+  condition   String
+  diagnosis   String
+  treatment   String?
+  severity    String?
+  diagnosedAt DateTime
+  resolvedAt  DateTime?
+  isActive    Boolean   @default(true)
+  isDeleted   Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@map("medical_history")
+}
+
+model Prescription {
+  id           String             @id @default(cuid())
+  patientId    String
+  doctorId     String
+  medication   String
+  dosage       String
+  frequency    String
+  duration     String
+  instructions String?
+  status       PrescriptionStatus @default(ACTIVE)
+  startDate    DateTime           @default(now())
+  endDate      DateTime?
+  prescribedAt DateTime           @default(now())
+  isDeleted    Boolean            @default(false)
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  deletedAt    DateTime?
+
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  doctor  Doctor  @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+
+  @@map("prescriptions")
+}
+
+model Notification {
+  id         String             @id @default(cuid())
+  userId     String
+  type       NotificationType
+  status     NotificationStatus @default(PENDING)
+  title      String
+  message    String
+  isRead     Boolean            @default(false)
+  readAt     DateTime?
+  sentAt     DateTime?
+  scheduledAt DateTime?
+  metadata   Json?
+  isDeleted  Boolean            @default(false)
+  createdAt  DateTime           @default(now())
+  updatedAt  DateTime           @updatedAt
+  deletedAt  DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String
+  action     String
+  resource   String
+  resourceId String?
+  oldValues  Json?
+  newValues  Json?
+  details    Json?
+  ipAddress  String?
+  userAgent  String?
+  sessionId  String?
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([resource, resourceId])
+  @@map("audit_logs")
+}
+
+model Role {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  permissions String[]
+  isActive    Boolean  @default(true)
+  isDeleted   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+
+  userRoles UserRoleAssignment[]
+
+  @@map("roles")
+}
+
+model UserRoleAssignment {
+  id        String    @id @default(cuid())
+  userId    String
+  roleId    String
+  assignedAt DateTime @default(now())
+  assignedBy String?
+  revokedAt DateTime?
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roleId])
+  @@map("user_role_assignments")
+}

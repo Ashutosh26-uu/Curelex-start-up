@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: healthcare-postgres
+    environment:
+      POSTGRES_DB: healthcare_db
+      POSTGRES_USER: healthcare_user
+      POSTGRES_PASSWORD: healthcare_pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - healthcare-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: healthcare-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - healthcare-network
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: healthcare-app
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=postgresql://healthcare_user:healthcare_pass@postgres:5432/healthcare_db
+      - REDIS_URL=redis://redis:6379
+    volumes:
+      - .:/app
+      - /app/node_modules
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - healthcare-network
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  healthcare-network:
+    driver: bridge
