@@ -36,6 +36,7 @@ export const authApi = {
 };
 
 export const patientApi = {
+  getAll: () => api.get('/patients'),
   getProfile: (id: string) => api.get(`/patients/${id}`),
   updateProfile: (id: string, data: any) => api.patch(`/patients/${id}`, data),
   getMedicalHistory: (id: string) => api.get(`/patients/${id}/medical-history`),

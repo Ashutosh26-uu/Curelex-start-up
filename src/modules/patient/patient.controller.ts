@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, UseGuards, Request } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { PatientService } from './patient.service';
 import { CreatePatientDto } from './dto/create-patient.dto';
@@ -10,58 +10,63 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
 
 @ApiTags('Patients')
-@ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('patients')
 export class PatientController {
-  constructor(private patientService: PatientService) {}
+  constructor(private readonly patientService: PatientService) {}
 
-  @ApiOperation({ summary: 'Register new patient' })
-  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Patient registration (public)' })
   @Post('register')
-  registerPatient(@Body() patientRegisterDto: PatientRegisterDto) {
+  async register(@Body() patientRegisterDto: PatientRegisterDto) {
     return this.patientService.registerPatient(patientRegisterDto);
   }
 
-  @ApiOperation({ summary: 'Create patient profile' })
+  @ApiOperation({ summary: 'Create patient' })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.DOCTOR)
   @Post()
-  @Roles(UserRole.ADMIN, UserRole.NURSE)
-  create(@Body() createPatientDto: CreatePatientDto) {
+  async create(@Body() createPatientDto: CreatePatientDto) {
     return this.patientService.create(createPatientDto);
   }
 
   @ApiOperation({ summary: 'Get all patients' })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.DOCTOR, UserRole.NURSE, UserRole.JUNIOR_DOCTOR)
   @Get()
-  @Roles(UserRole.DOCTOR, UserRole.NURSE, UserRole.ADMIN)
-  findAll() {
-    return this.patientService.findAll();
+  async findAll() {
+    return { data: await this.patientService.findAll() };
   }
 
   @ApiOperation({ summary: 'Get patient by ID' })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
   @Get(':id')
-  @Roles(UserRole.PATIENT, UserRole.DOCTOR, UserRole.NURSE, UserRole.ADMIN)
-  findOne(@Param('id') id: string) {
+  async findOne(@Param('id') id: string) {
     return this.patientService.findOne(id);
   }
 
-  @ApiOperation({ summary: 'Update patient profile' })
+  @ApiOperation({ summary: 'Update patient' })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
   @Patch(':id')
-  @Roles(UserRole.PATIENT, UserRole.NURSE, UserRole.ADMIN)
-  update(@Param('id') id: string, @Body() updatePatientDto: UpdatePatientDto) {
+  async update(@Param('id') id: string, @Body() updatePatientDto: UpdatePatientDto) {
     return this.patientService.update(id, updatePatientDto);
   }
 
   @ApiOperation({ summary: 'Get patient medical history' })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
   @Get(':id/medical-history')
-  @Roles(UserRole.PATIENT, UserRole.DOCTOR, UserRole.NURSE, UserRole.ADMIN)
-  getMedicalHistory(@Param('id') id: string) {
+  async getMedicalHistory(@Param('id') id: string) {
     return this.patientService.getMedicalHistory(id);
   }
 
   @ApiOperation({ summary: 'Get patient past visits' })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
   @Get(':id/past-visits')
-  @Roles(UserRole.PATIENT, UserRole.DOCTOR, UserRole.NURSE, UserRole.ADMIN)
-  getPastVisits(@Param('id') id: string) {
+  async getPastVisits(@Param('id') id: string) {
     return this.patientService.getPastVisits(id);
   }
 }

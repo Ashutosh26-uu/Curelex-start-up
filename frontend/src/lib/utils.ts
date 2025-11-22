@@ -5,16 +5,27 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function formatDate(date: string | Date) {
-  return new Intl.DateTimeFormat('en-US', {
+export function getInitials(firstName?: string, lastName?: string): string {
+  if (!firstName && !lastName) return 'U';
+  const first = firstName?.charAt(0).toUpperCase() || '';
+  const last = lastName?.charAt(0).toUpperCase() || '';
+  return `${first}${last}`;
+}
+
+export function formatDate(date: string | Date): string {
+  return new Date(date).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+}
+
+export function formatDateTime(date: string | Date): string {
+  return new Date(date).toLocaleString('en-US', {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
-  }).format(new Date(date));
-}
-
-export function getInitials(firstName: string, lastName: string) {
-  return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
+  });
 }
