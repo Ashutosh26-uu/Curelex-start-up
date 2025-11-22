@@ -55,7 +55,7 @@ export default function OfficerAnalytics() {
                           <div 
                             className="bg-primary-600 h-2 rounded-full" 
                             style={{ width: `${percentage}%` }}
-                          />
+                          ></div>
                         </div>
                       </div>
                     );
@@ -88,7 +88,7 @@ export default function OfficerAnalytics() {
                   <div className="pt-4">
                     <div className="text-xs text-gray-500 mb-2">Registration Activity</div>
                     <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div className="bg-green-500 h-2 rounded-full" style={{ width: '75%' }} />
+                      <div className="bg-green-500 h-2 rounded-full" style={{ width: '75%' }}></div>
                     </div>
                   </div>
                 </div>

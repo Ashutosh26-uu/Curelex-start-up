@@ -8,12 +8,14 @@ import { authApi } from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { Select } from '@/components/ui/Select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Stethoscope } from 'lucide-react';
 
 interface LoginForm {
   email: string;
   password: string;
+  role?: string;
 }
 
 export default function LoginPage() {
@@ -53,6 +55,14 @@ export default function LoginPage() {
           <p className="mt-2 text-sm text-gray-600">
             Healthcare Telemedicine Platform
           </p>
+          <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+            <p className="text-xs text-blue-800 font-medium mb-1">Demo Credentials:</p>
+            <div className="text-xs text-blue-700 space-y-1">
+              <div>Admin: admin@healthcare.com / admin123</div>
+              <div>Doctor: doctor@healthcare.com / doctor123</div>
+              <div>Patient: patient@healthcare.com / patient123</div>
+            </div>
+          </div>
         </div>
 
         <Card>
@@ -93,6 +103,24 @@ export default function LoginPage() {
                 error={errors.password?.message}
               />
 
+              <Select
+                label="Login As (Optional)"
+                options={[
+                  { value: '', label: 'Auto-detect role' },
+                  { value: 'PATIENT', label: 'Patient' },
+                  { value: 'DOCTOR', label: 'Doctor' },
+                  { value: 'JUNIOR_DOCTOR', label: 'Junior Doctor' },
+                  { value: 'NURSE', label: 'Nurse' },
+                  { value: 'ADMIN', label: 'Administrator' },
+                  { value: 'CEO', label: 'CEO' },
+                  { value: 'CTO', label: 'CTO' },
+                  { value: 'CFO', label: 'CFO' },
+                  { value: 'CLO', label: 'CLO' },
+                  { value: 'CMO', label: 'CMO' }
+                ]}
+                {...register('role')}
+              />
+
               <Button
                 type="submit"
                 className="w-full"
@@ -100,6 +128,15 @@ export default function LoginPage() {
               >
                 Sign in
               </Button>
+
+              <div className="text-center mt-4">
+                <p className="text-sm text-gray-600">
+                  New patient?{' '}
+                  <a href="/register" className="text-primary-600 hover:text-primary-700 font-medium">
+                    Register here
+                  </a>
+                </p>
+              </div>
             </form>
           </CardContent>
         </Card>
