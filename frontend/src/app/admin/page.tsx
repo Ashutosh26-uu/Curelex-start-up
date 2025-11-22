@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Select } from '@/components/ui/Select';
 import { UserRole } from '@/types';
-import { api } from '@/lib/api';
+import { adminApi } from '@/lib/api';
 import { Users, UserPlus, Settings, Activity } from 'lucide-react';
 
 export default function AdminPage() {
@@ -17,17 +17,16 @@ export default function AdminPage() {
 
   const { data: users, refetch: refetchUsers } = useQuery({
     queryKey: ['admin', 'users'],
-    queryFn: () => api.get('/admin/users'),
+    queryFn: () => adminApi.getUsers(),
   });
 
   const { data: stats } = useQuery({
     queryKey: ['admin', 'stats'],
-    queryFn: () => api.get('/admin/stats'),
+    queryFn: () => adminApi.getStats(),
   });
 
   const assignDoctorMutation = useMutation({
-    mutationFn: (data: { doctorId: string; patientId: string }) =>
-      api.post('/admin/assign-doctor', data),
+    mutationFn: adminApi.assignDoctor,
     onSuccess: () => {
       setSelectedDoctor('');
       setSelectedPatient('');
@@ -37,7 +36,7 @@ export default function AdminPage() {
 
   const toggleUserStatusMutation = useMutation({
     mutationFn: ({ userId, isActive }: { userId: string; isActive: boolean }) =>
-      api.patch(`/admin/users/${userId}`, { isActive: !isActive }),
+      adminApi.toggleUserStatus(userId, { isActive: !isActive }),
     onSuccess: () => refetchUsers(),
   });
 

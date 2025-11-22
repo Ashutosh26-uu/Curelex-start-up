@@ -73,3 +73,10 @@ export const notificationApi = {
   getAll: () => api.get('/notifications/me'),
   markAsRead: (id: string) => api.patch(`/notifications/${id}/read`),
 };
+
+export const adminApi = {
+  getUsers: () => api.get('/admin/users'),
+  getStats: () => api.get('/admin/stats'),
+  assignDoctor: (data: any) => api.post('/admin/assign-doctor', data),
+  toggleUserStatus: (userId: string, data: any) => api.patch(`/admin/users/${userId}`, data),
+};

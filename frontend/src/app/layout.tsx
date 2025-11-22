@@ -7,7 +7,7 @@ const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
   title: 'Healthcare Telemedicine Platform',
-  description: 'Comprehensive healthcare management system',
+  description: 'Complete healthcare management system',
 };
 
 export default function RootLayout({
