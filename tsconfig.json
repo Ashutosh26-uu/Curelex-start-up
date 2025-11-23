@@ -12,11 +12,13 @@
     "baseUrl": "./",
     "incremental": true,
     "skipLibCheck": true,
-    "strict": true,
+    "strict": false,
     "paths": {
       "@/*": ["src/*"],
       "@/common/*": ["src/common/*"],
       "@/modules/*": ["src/modules/*"]
     }
-  }
+  },
+  "include": ["src/**/*", "prisma/**/*"],
+  "exclude": ["frontend/**/*", "node_modules", "dist"]
 }

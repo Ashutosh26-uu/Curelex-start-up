@@ -38,9 +38,6 @@ export class LoggingService {
 
     return this.prisma.auditLog.findMany({
       where,
-      include: {
-        user: { include: { profile: true } },
-      },
       orderBy: { createdAt: 'desc' },
     });
   }
