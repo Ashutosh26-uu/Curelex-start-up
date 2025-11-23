@@ -138,7 +138,7 @@ export class OfficerService {
       select: { scheduledAt: true, status: true }
     });
 
-    const trends = appointments.reduce((acc, appointment) => {
+    const trends = appointments.reduce((acc: any, appointment) => {
       const date = appointment.scheduledAt.toISOString().split('T')[0];
       if (!acc[date]) acc[date] = { total: 0, completed: 0 };
       acc[date].total++;
@@ -146,7 +146,7 @@ export class OfficerService {
       return acc;
     }, {});
 
-    return Object.entries(trends).map(([date, data]) => ({
+    return Object.entries(trends).map(([date, data]: [string, any]) => ({
       date,
       total: data.total,
       completed: data.completed,

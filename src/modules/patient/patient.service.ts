@@ -89,7 +89,7 @@ export class PatientService {
   }
 
   async registerPatient(patientRegisterDto: PatientRegisterDto) {
-    const { name, age, gender, mobile, email, medicalHistory, symptoms, emergencyContact, identificationNumber } = patientRegisterDto;
+    const { name, age, gender, mobile, email, medicalHistory, symptoms, emergencyContact } = patientRegisterDto;
     
     // Check if user already exists
     const existingUser = await this.prisma.user.findUnique({
