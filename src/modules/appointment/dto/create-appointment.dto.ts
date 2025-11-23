@@ -1,6 +1,6 @@
 import { IsString, IsDateString, IsNumber, IsOptional, IsEnum } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
-import { AppointmentStatus } from '@prisma/client';
+import { AppointmentStatus } from '../../../common/enums/appointment-status.enum';
 
 export class CreateAppointmentDto {
   @ApiProperty()

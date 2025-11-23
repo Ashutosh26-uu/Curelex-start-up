@@ -190,6 +190,24 @@ export class AuthService {
     return { message: 'Password reset successfully' };
   }
 
+  async validateUser(email: string, password: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+      include: {
+        profile: true,
+        patient: true,
+        doctor: true,
+        officer: true,
+      },
+    });
+
+    if (user && await bcrypt.compare(password, user.password)) {
+      const { password: _, ...result } = user;
+      return result;
+    }
+    return null;
+  }
+
   private async generateTokens(userId: string, email: string, role: string) {
     const payload = { sub: userId, email, role };
 

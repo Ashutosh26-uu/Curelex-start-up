@@ -7,42 +7,11 @@ datasource db {
   url      = "file:./dev.db"
 }
 
-enum UserRole {
-  PATIENT
-  DOCTOR
-  JUNIOR_DOCTOR
-  NURSE
-  CEO
-  CTO
-  CFO
-  CMO
-  ADMIN
-}
-
-enum AppointmentStatus {
-  SCHEDULED
-  CONFIRMED
-  IN_PROGRESS
-  COMPLETED
-  CANCELLED
-  NO_SHOW
-}
-
-enum VitalType {
-  BLOOD_PRESSURE
-  HEART_RATE
-  TEMPERATURE
-  OXYGEN_SATURATION
-  BLOOD_SUGAR
-  WEIGHT
-  HEIGHT
-}
-
 model User {
   id               String    @id @default(cuid())
   email            String    @unique
   password         String
-  role             UserRole
+  role             String
   isActive         Boolean   @default(true)
   isDeleted        Boolean   @default(false)
   refreshToken     String?
@@ -182,7 +151,7 @@ model Appointment {
   scheduledAt   DateTime
   completedAt   DateTime?
   duration      Int               @default(30)
-  status        AppointmentStatus @default(SCHEDULED)
+  status        String @default("SCHEDULED")
   meetLink      String?
   notes         String?
   diagnosis     String?
@@ -203,7 +172,7 @@ model Vital {
   id         String    @id @default(cuid())
   patientId  String
   doctorId   String?
-  type       VitalType
+  type       String
   value      String
   unit       String
   recordedBy String

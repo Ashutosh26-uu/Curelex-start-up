@@ -27,9 +27,9 @@ import { WebSocketModule } from './modules/websocket/websocket.module';
     }),
     CacheModule.register({
       isGlobal: true,
-      store: redisStore,
+      store: redisStore as any,
       host: process.env.REDIS_HOST || 'localhost',
-      port: parseInt(process.env.REDIS_PORT) || 6379,
+      port: parseInt(process.env.REDIS_PORT || '6379'),
       ttl: 300,
     }),
     ThrottlerModule.forRoot([{

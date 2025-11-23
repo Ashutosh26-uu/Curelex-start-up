@@ -16,6 +16,9 @@ export interface User {
   role: UserRole;
   isActive: boolean;
   profile?: Profile;
+  patient?: Patient;
+  doctor?: Doctor;
+  officer?: Officer;
 }
 
 export interface Profile {
@@ -24,6 +27,9 @@ export interface Profile {
   lastName: string;
   phone?: string;
   avatar?: string;
+  dateOfBirth?: string;
+  gender?: string;
+  address?: string;
 }
 
 export interface Patient {
@@ -32,34 +38,20 @@ export interface Patient {
   emergencyContact?: string;
   bloodGroup?: string;
   allergies?: string;
-  user: User;
 }
 
 export interface Doctor {
   id: string;
   doctorId: string;
   specialization: string;
+  licenseNumber: string;
   experience: number;
   consultationFee: number;
-  user: User;
 }
 
-export interface Appointment {
+export interface Officer {
   id: string;
-  scheduledAt: string;
-  duration: number;
-  status: string;
-  meetLink?: string;
-  notes?: string;
-  patient: Patient;
-  doctor: Doctor;
-}
-
-export interface Vital {
-  id: string;
-  type: string;
-  value: string;
-  unit: string;
-  recordedAt: string;
-  notes?: string;
+  officerId: string;
+  department?: string;
+  position?: string;
 }

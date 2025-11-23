@@ -1,6 +1,6 @@
 import { IsString, IsEnum, IsOptional } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
-import { VitalType } from '@prisma/client';
+import { VitalType } from '../../../common/enums/vital-type.enum';
 
 export class CreateVitalDto {
   @ApiProperty()
