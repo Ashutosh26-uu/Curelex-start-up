@@ -104,8 +104,8 @@ export class PatientService {
     const existingPatient = await this.prisma.patient.findFirst({
       where: { 
         OR: [
-          { emergencyContact: identificationNumber },
-          { patientId: { contains: identificationNumber.slice(-4) } }
+          { emergencyContact: emergencyContact },
+          { patientId: { contains: mobile.slice(-4) } }
         ]
       },
     });
@@ -124,7 +124,7 @@ export class PatientService {
     const lastName = nameParts.slice(1).join(' ') || '';
 
     // Generate unique patient ID
-    const uniquePatientId = this.generateUniquePatientId(identificationNumber);
+    const uniquePatientId = this.generateUniquePatientId(mobile);
 
     // Create user and patient in transaction
     const result = await this.prisma.$transaction(async (tx) => {
@@ -155,7 +155,7 @@ export class PatientService {
           emergencyContact,
           chronicConditions: symptoms,
           // Store identification number in emergency contact field for now
-          emergencyPhone: identificationNumber,
+          emergencyPhone: emergencyContact,
         },
         include: {
           user: { include: { profile: true } },
