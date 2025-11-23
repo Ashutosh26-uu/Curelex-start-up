@@ -23,15 +23,14 @@ export function RoleGuard({ allowedRoles, children, fallback }: RoleGuardProps) 
 
     if (user && !allowedRoles.includes(user.role)) {
       router.push('/unauthorized');
-      return;
     }
   }, [isAuthenticated, user, allowedRoles, router]);
 
-  if (!isAuthenticated || !user) {
+  if (!isAuthenticated) {
     return fallback || <div>Loading...</div>;
   }
 
-  if (!allowedRoles.includes(user.role)) {
+  if (user && !allowedRoles.includes(user.role)) {
     return fallback || <div>Access Denied</div>;
   }
 
