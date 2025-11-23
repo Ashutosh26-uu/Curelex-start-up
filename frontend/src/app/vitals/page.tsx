@@ -161,10 +161,10 @@ export default function VitalsPage() {
                 <div className="p-4 bg-blue-50 rounded-lg">
                   <h4 className="font-medium text-blue-900 mb-2">Critical Values Alert</h4>
                   <ul className="text-sm text-blue-800 space-y-1">
-                    <li>• BP: >180/120 mmHg</li>
-                    <li>• Heart Rate: <50 or >120 bpm</li>
-                    <li>• O2 Sat: <90%</li>
-                    <li>• Temperature: <95°F or >103°F</li>
+                    <li>• BP: &gt;180/120 mmHg</li>
+                    <li>• Heart Rate: &lt;50 or &gt;120 bpm</li>
+                    <li>• O2 Sat: &lt;90%</li>
+                    <li>• Temperature: &lt;95°F or &gt;103°F</li>
                   </ul>
                 </div>
               </CardContent>

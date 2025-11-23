@@ -79,8 +79,28 @@ async function main() {
     },
   });
 
+  // Create Ashutosh Admin User
+  const ashutoshPassword = await bcrypt.hash('admin@123', 12);
+  const ashutosh = await prisma.user.upsert({
+    where: { email: 'ashutosh@curelex.com' },
+    update: {},
+    create: {
+      email: 'ashutosh@curelex.com',
+      password: ashutoshPassword,
+      role: 'ADMIN',
+      profile: {
+        create: {
+          firstName: 'Ashutosh',
+          lastName: 'Mishra',
+          phone: '+919876543210',
+        },
+      },
+    },
+  });
+
   console.log('✅ Seed data created successfully!');
   console.log('🔑 Login credentials:');
+  console.log('Ashutosh Admin: ashutosh@curelex.com / admin@123');
   console.log('Admin: admin@healthcare.com / admin123');
   console.log('Doctor: doctor@healthcare.com / doctor123');
   console.log('Patient: patient@healthcare.com / patient123');

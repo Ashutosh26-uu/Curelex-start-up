@@ -7,11 +7,42 @@ datasource db {
   url      = "file:./dev.db"
 }
 
+enum UserRole {
+  PATIENT
+  DOCTOR
+  JUNIOR_DOCTOR
+  NURSE
+  CEO
+  CTO
+  CFO
+  CMO
+  ADMIN
+}
+
+enum AppointmentStatus {
+  SCHEDULED
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum VitalType {
+  BLOOD_PRESSURE
+  HEART_RATE
+  TEMPERATURE
+  OXYGEN_SATURATION
+  BLOOD_SUGAR
+  WEIGHT
+  HEIGHT
+}
+
 model User {
   id               String    @id @default(cuid())
   email            String    @unique
   password         String
-  role             String
+  role             UserRole
   isActive         Boolean   @default(true)
   isDeleted        Boolean   @default(false)
   refreshToken     String?
@@ -26,6 +57,7 @@ model User {
   profile       Profile?
   patient       Patient?
   doctor        Doctor?
+  officer       Officer?
   notifications Notification[]
 
   @@map("users")
@@ -107,6 +139,22 @@ model Doctor {
   @@map("doctors")
 }
 
+model Officer {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  officerId   String   @unique
+  department  String?
+  position    String?
+  isDeleted   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("officers")
+}
+
 model DoctorPatientAssignment {
   id         String    @id @default(cuid())
   doctorId   String
@@ -134,7 +182,7 @@ model Appointment {
   scheduledAt   DateTime
   completedAt   DateTime?
   duration      Int               @default(30)
-  status        String @default("SCHEDULED")
+  status        AppointmentStatus @default(SCHEDULED)
   meetLink      String?
   notes         String?
   diagnosis     String?
@@ -155,7 +203,7 @@ model Vital {
   id         String    @id @default(cuid())
   patientId  String
   doctorId   String?
-  type       String
+  type       VitalType
   value      String
   unit       String
   recordedBy String
@@ -236,4 +284,17 @@ model Notification {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("notifications")
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  action    String
+  resource  String
+  details   String?
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@map("audit_logs")
 }

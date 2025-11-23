@@ -8,36 +8,38 @@ import { authApi } from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { Select } from '@/components/ui/Select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Stethoscope } from 'lucide-react';
 
-interface LoginForm {
+interface PatientLoginForm {
   email: string;
   password: string;
-  role?: string;
 }
 
-export default function LoginPage() {
+export default function PatientLoginPage() {
   const router = useRouter();
   const { login } = useAuthStore();
   const [error, setError] = useState('');
 
-  const { register, handleSubmit, formState: { errors } } = useForm<LoginForm>();
+  const { register, handleSubmit, formState: { errors } } = useForm<PatientLoginForm>();
 
   const loginMutation = useMutation({
     mutationFn: authApi.login,
     onSuccess: (response) => {
       const { user, access_token } = response.data;
+      if (user.role !== 'PATIENT') {
+        setError('This login is only for patients. Please use staff login.');
+        return;
+      }
       login(user, access_token);
-      router.push('/');
+      router.push('/patient');
     },
     onError: (error: any) => {
       setError(error.response?.data?.message || 'Login failed');
     },
   });
 
-  const onSubmit = (data: LoginForm) => {
+  const onSubmit = (data: PatientLoginForm) => {
     setError('');
     loginMutation.mutate(data);
   };
@@ -50,24 +52,16 @@ export default function LoginPage() {
             <Stethoscope className="h-12 w-12 text-primary-600" />
           </div>
           <h2 className="mt-6 text-3xl font-extrabold text-gray-900">
-            Sign in to your account
+            Patient Login
           </h2>
           <p className="mt-2 text-sm text-gray-600">
-            Healthcare Telemedicine Platform
+            Access your healthcare dashboard
           </p>
-          <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-            <p className="text-xs text-blue-800 font-medium mb-1">Login Credentials:</p>
-            <div className="text-xs text-blue-700 space-y-1">
-              <div><strong>Admin:</strong> ashutosh@curelex.com / admin@123</div>
-              <div><strong>Doctor:</strong> doctor@healthcare.com / doctor123</div>
-              <div><strong>Patient:</strong> patient@healthcare.com / patient123</div>
-            </div>
-          </div>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle>Login</CardTitle>
+            <CardTitle>Login to Your Account</CardTitle>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
@@ -103,17 +97,15 @@ export default function LoginPage() {
                 error={errors.password?.message}
               />
 
-
-
               <Button
                 type="submit"
                 className="w-full"
                 loading={loginMutation.isPending}
               >
-                Sign in
+                Sign in as Patient
               </Button>
 
-              <div className="text-center mt-4">
+              <div className="text-center mt-4 space-y-2">
                 <p className="text-sm text-gray-600">
                   New patient?{' '}
                   <a href="/register" className="text-primary-600 hover:text-primary-700 font-medium">

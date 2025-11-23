@@ -12,13 +12,16 @@ import { Stethoscope } from 'lucide-react';
 import { api } from '@/lib/api';
 
 interface RegisterForm {
-  name: string;
+  firstName: string;
+  middleName?: string;
+  lastName: string;
   age: number;
   gender: string;
   mobile: string;
   email: string;
   emergencyContact: string;
   symptoms: string;
+  identificationNumber: string;
 }
 
 export default function RegisterPage() {
@@ -34,9 +37,14 @@ export default function RegisterPage() {
     setError('');
     
     try {
-      await api.post('/patients/register', { ...data, medicalHistory: [] });
+      const payload = {
+        ...data,
+        name: `${data.firstName} ${data.middleName ? data.middleName + ' ' : ''}${data.lastName}`,
+        medicalHistory: []
+      };
+      await api.post('/patients/register', payload);
       setSuccess(true);
-      setTimeout(() => router.push('/login'), 3000);
+      setTimeout(() => router.push('/patient-login'), 3000);
     } catch (err: any) {
       setError(err.response?.data?.message || 'Registration failed');
     } finally {
@@ -64,7 +72,7 @@ export default function RegisterPage() {
         <div className="text-center mb-8">
           <Stethoscope className="h-12 w-12 text-primary-600 mx-auto" />
           <h1 className="mt-4 text-3xl font-bold text-gray-900">Patient Registration</h1>
-          <p className="mt-2 text-gray-600">Join our healthcare platform</p>
+          <p className="mt-2 text-gray-600">Join our healthcare platform - Made in India 🇮🇳</p>
         </div>
 
         <Card>
@@ -79,15 +87,29 @@ export default function RegisterPage() {
                 </div>
               )}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <Input
-                  label="Full Name"
-                  {...register('name', { required: 'Name is required' })}
-                  error={errors.name?.message}
+                  label="First Name *"
+                  {...register('firstName', { required: 'First name is required' })}
+                  error={errors.firstName?.message}
                 />
                 
                 <Input
-                  label="Age"
+                  label="Middle Name (Optional)"
+                  {...register('middleName')}
+                  error={errors.middleName?.message}
+                />
+                
+                <Input
+                  label="Last Name *"
+                  {...register('lastName', { required: 'Last name is required' })}
+                  error={errors.lastName?.message}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Input
+                  label="Age *"
                   type="number"
                   {...register('age', { 
                     required: 'Age is required',
@@ -95,11 +117,22 @@ export default function RegisterPage() {
                   })}
                   error={errors.age?.message}
                 />
+                
+                <Input
+                  label="Identification Number (Aadhaar/Phone) *"
+                  placeholder="Enter Aadhaar or Phone number"
+                  {...register('identificationNumber', { 
+                    required: 'Identification number is required',
+                    minLength: { value: 10, message: 'Must be at least 10 digits' },
+                    maxLength: { value: 12, message: 'Must not exceed 12 digits' }
+                  })}
+                  error={errors.identificationNumber?.message}
+                />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Select
-                  label="Gender"
+                  label="Gender *"
                   options={[
                     { value: '', label: 'Select Gender' },
                     { value: 'MALE', label: 'Male' },
@@ -110,15 +143,34 @@ export default function RegisterPage() {
                   error={errors.gender?.message}
                 />
 
-                <Input
-                  label="Mobile Number"
-                  {...register('mobile', { required: 'Mobile is required' })}
-                  error={errors.mobile?.message}
-                />
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Mobile Number *</label>
+                  <div className="flex mt-1">
+                    <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">
+                      +91
+                    </span>
+                    <input
+                      type="tel"
+                      maxLength={10}
+                      className="flex-1 rounded-r-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                      placeholder="Enter 10-digit mobile number"
+                      {...register('mobile', { 
+                        required: 'Mobile number is required',
+                        pattern: {
+                          value: /^[0-9]{10}$/,
+                          message: 'Mobile number must be exactly 10 digits'
+                        }
+                      })}
+                    />
+                  </div>
+                  {errors.mobile && (
+                    <p className="text-sm text-red-600 mt-1">{errors.mobile.message}</p>
+                  )}
+                </div>
               </div>
 
               <Input
-                label="Email"
+                label="Email *"
                 type="email"
                 {...register('email', { 
                   required: 'Email is required',
@@ -128,7 +180,8 @@ export default function RegisterPage() {
               />
 
               <Input
-                label="Emergency Contact"
+                label="Emergency Contact *"
+                placeholder="Emergency contact number"
                 {...register('emergencyContact', { required: 'Emergency contact is required' })}
                 error={errors.emergencyContact?.message}
               />

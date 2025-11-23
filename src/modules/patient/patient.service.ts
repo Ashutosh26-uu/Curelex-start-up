@@ -81,8 +81,15 @@ export class PatientService {
     });
   }
 
+  private generateUniquePatientId(identificationNumber: string): string {
+    // Generate unique patient ID based on identification number
+    const timestamp = Date.now().toString().slice(-6);
+    const idHash = identificationNumber.slice(-4);
+    return `PAT-${idHash}-${timestamp}`;
+  }
+
   async registerPatient(patientRegisterDto: PatientRegisterDto) {
-    const { name, age, gender, mobile, email, medicalHistory, symptoms, emergencyContact } = patientRegisterDto;
+    const { name, age, gender, mobile, email, medicalHistory, symptoms, emergencyContact, identificationNumber } = patientRegisterDto;
     
     // Check if user already exists
     const existingUser = await this.prisma.user.findUnique({
@@ -91,6 +98,20 @@ export class PatientService {
 
     if (existingUser) {
       throw new Error('User with this email already exists');
+    }
+
+    // Check if identification number already exists
+    const existingPatient = await this.prisma.patient.findFirst({
+      where: { 
+        OR: [
+          { emergencyContact: identificationNumber },
+          { patientId: { contains: identificationNumber.slice(-4) } }
+        ]
+      },
+    });
+
+    if (existingPatient) {
+      throw new Error('Patient with this identification number already exists');
     }
 
     // Generate temporary password
@@ -102,6 +123,9 @@ export class PatientService {
     const firstName = nameParts[0];
     const lastName = nameParts.slice(1).join(' ') || '';
 
+    // Generate unique patient ID
+    const uniquePatientId = this.generateUniquePatientId(identificationNumber);
+
     // Create user and patient in transaction
     const result = await this.prisma.$transaction(async (tx) => {
       // Create user
@@ -109,12 +133,12 @@ export class PatientService {
         data: {
           email,
           password: hashedPassword,
-          role: UserRole.PATIENT,
+          role: 'PATIENT',
           profile: {
             create: {
               firstName,
               lastName,
-              phone: mobile,
+              phone: `+91${mobile}`,
               gender,
               dateOfBirth: new Date(Date.now() - age * 365 * 24 * 60 * 60 * 1000),
             },
@@ -123,13 +147,15 @@ export class PatientService {
         include: { profile: true },
       });
 
-      // Create patient
+      // Create patient with unique ID
       const patient = await tx.patient.create({
         data: {
           userId: user.id,
-          patientId: `PAT-${Date.now()}`,
+          patientId: uniquePatientId,
           emergencyContact,
           chronicConditions: symptoms,
+          // Store identification number in emergency contact field for now
+          emergencyPhone: identificationNumber,
         },
         include: {
           user: { include: { profile: true } },
@@ -137,7 +163,7 @@ export class PatientService {
       });
 
       // Create medical history entries
-      if (medicalHistory.length > 0) {
+      if (medicalHistory && medicalHistory.length > 0) {
         await tx.medicalHistory.createMany({
           data: medicalHistory.map((condition) => ({
             patientId: patient.id,
@@ -148,13 +174,13 @@ export class PatientService {
         });
       }
 
-      return { user, patient, tempPassword };
+      return { user, patient, tempPassword, uniquePatientId };
     });
 
     // Broadcast WebSocket event
     this.websocketGateway.broadcastNewPatientRegistration({
       patientId: result.patient.id,
-      patientNumber: result.patient.patientId,
+      patientNumber: result.uniquePatientId,
       name,
       email,
       age,
@@ -170,6 +196,7 @@ export class PatientService {
       user: userWithoutPassword,
       patient: result.patient,
       tempPassword: result.tempPassword,
+      patientId: result.uniquePatientId,
     };
   }
 
@@ -177,7 +204,7 @@ export class PatientService {
     const officers = await this.prisma.user.findMany({
       where: {
         role: {
-          in: [UserRole.CEO, UserRole.CTO, UserRole.CFO, UserRole.CMO],
+          in: ['CEO', 'CTO', 'CFO', 'CMO'],
         },
         isActive: true,
       },
@@ -188,10 +215,10 @@ export class PatientService {
       type: 'PUSH',
       title: 'New Patient Registration',
       message: `New patient ${patientName} has registered in the system.`,
-      metadata: {
+      metadata: JSON.stringify({
         patientId: patient.id,
         type: 'patient-registration',
-      },
+      }),
     }));
 
     await Promise.all(
