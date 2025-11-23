@@ -54,6 +54,9 @@
     "twilio": "^4.19.0",
     "winston": "^3.11.0"
   },
+  "prisma": {
+    "seed": "ts-node prisma/seed.ts"
+  },
   "devDependencies": {
     "@nestjs/cli": "^10.0.0",
     "@nestjs/schematics": "^10.0.0",
