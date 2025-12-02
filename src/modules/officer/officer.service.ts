@@ -196,7 +196,7 @@ export class OfficerService {
           createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
         },
       }),
-      this.prisma.user.count(), // Simplified database size metric
+      this.prisma.user.count(),
     ]);
 
     return {
@@ -206,6 +206,23 @@ export class OfficerService {
       databaseSize,
       uptime: process.uptime(),
       memoryUsage: process.memoryUsage(),
+    };
+  }
+
+  async getComprehensiveDashboard() {
+    const [stats, appointmentAnalytics, patientAnalytics, systemHealth] = await Promise.all([
+      this.getDashboardStats(),
+      this.getAppointmentAnalytics(),
+      this.getPatientAnalytics(),
+      this.getSystemHealth(),
+    ]);
+
+    return {
+      stats,
+      appointmentAnalytics,
+      patientAnalytics,
+      systemHealth,
+      timestamp: new Date(),
     };
   }
 }

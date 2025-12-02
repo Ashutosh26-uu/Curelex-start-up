@@ -20,6 +20,7 @@ import { AdminModule } from './modules/admin/admin.module';
 import { LoggingModule } from './modules/logging/logging.module';
 import { IntegrationModule } from './modules/integration/integration.module';
 import { WebSocketModule } from './modules/websocket/websocket.module';
+import { PrescriptionModule } from './modules/prescription/prescription.module';
 
 @Module({
   controllers: [AppController],
@@ -57,6 +58,7 @@ import { WebSocketModule } from './modules/websocket/websocket.module';
     LoggingModule,
     IntegrationModule,
     WebSocketModule,
+    PrescriptionModule,
   ],
 })
 export class AppModule {}

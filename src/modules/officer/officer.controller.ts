@@ -13,8 +13,15 @@ import { UserRole } from '../../common/enums/user-role.enum';
 export class OfficerController {
   constructor(private officerService: OfficerService) {}
 
-  @ApiOperation({ summary: 'Get dashboard statistics' })
+  @ApiOperation({ summary: 'Get comprehensive dashboard' })
   @Get('dashboard')
+  @Roles(UserRole.CEO, UserRole.CTO, UserRole.CFO, UserRole.CMO)
+  getDashboard() {
+    return this.officerService.getComprehensiveDashboard();
+  }
+
+  @ApiOperation({ summary: 'Get dashboard statistics' })
+  @Get('stats')
   @Roles(UserRole.CEO, UserRole.CTO, UserRole.CFO, UserRole.CMO)
   getDashboardStats() {
     return this.officerService.getDashboardStats();
