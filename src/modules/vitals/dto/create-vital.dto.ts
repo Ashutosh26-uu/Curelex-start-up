@@ -1,6 +1,15 @@
 import { IsString, IsEnum, IsOptional } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
-import { VitalType } from '../../../common/enums/vital-type.enum';
+
+export enum VitalType {
+  BLOOD_PRESSURE = 'BLOOD_PRESSURE',
+  HEART_RATE = 'HEART_RATE',
+  OXYGEN_SATURATION = 'OXYGEN_SATURATION',
+  BLOOD_SUGAR = 'BLOOD_SUGAR',
+  TEMPERATURE = 'TEMPERATURE',
+  WEIGHT = 'WEIGHT',
+  HEIGHT = 'HEIGHT',
+}
 
 export class CreateVitalDto {
   @ApiProperty()
@@ -18,10 +27,6 @@ export class CreateVitalDto {
   @ApiProperty()
   @IsString()
   unit: string;
-
-  @ApiProperty()
-  @IsString()
-  recordedBy: string;
 
   @ApiProperty({ required: false })
   @IsOptional()

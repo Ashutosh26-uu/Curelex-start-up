@@ -1,6 +1,5 @@
-import { IsString, IsDateString, IsNumber, IsOptional, IsEnum } from 'class-validator';
+import { IsString, IsDateString, IsOptional, IsNumber, Min } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
-import { AppointmentStatus } from '../../../common/enums/appointment-status.enum';
 
 export class CreateAppointmentDto {
   @ApiProperty()
@@ -15,15 +14,11 @@ export class CreateAppointmentDto {
   @IsDateString()
   scheduledAt: string;
 
-  @ApiProperty({ required: false })
+  @ApiProperty({ default: 30 })
   @IsOptional()
   @IsNumber()
+  @Min(15)
   duration?: number;
-
-  @ApiProperty({ enum: AppointmentStatus, required: false })
-  @IsOptional()
-  @IsEnum(AppointmentStatus)
-  status?: AppointmentStatus;
 
   @ApiProperty({ required: false })
   @IsOptional()

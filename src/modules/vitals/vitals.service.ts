@@ -1,6 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
-import { WebSocketGatewayService } from '../websocket/websocket.gateway';
+import { NotificationService } from '../notification/notification.service';
 import { CreateVitalDto } from './dto/create-vital.dto';
 import { UpdateVitalsDto } from './dto/update-vitals.dto';
 
@@ -8,122 +8,183 @@ import { UpdateVitalsDto } from './dto/update-vitals.dto';
 export class VitalsService {
   constructor(
     private prisma: PrismaService,
-    private websocketGateway: WebSocketGatewayService,
+    private notificationService: NotificationService,
   ) {}
 
-  async create(createVitalDto: CreateVitalDto) {
+  async create(createVitalDto: CreateVitalDto, recordedByUserId: string) {
+    const { patientId, type, value, unit, notes } = createVitalDto;
+
+    // Get doctor info if recorded by doctor
+    const doctor = await this.prisma.doctor.findUnique({
+      where: { userId: recordedByUserId },
+    });
+
     const vital = await this.prisma.vital.create({
-      data: createVitalDto,
+      data: {
+        patientId,
+        doctorId: doctor?.id,
+        type,
+        value,
+        unit,
+        notes,
+        recordedBy: recordedByUserId,
+      },
       include: {
-        patient: { 
-          include: { 
-            user: { include: { profile: true } },
-            assignedDoctors: { where: { isActive: true }, include: { doctor: true } }
-          } 
-        },
+        patient: { include: { user: { include: { profile: true } } } },
+        recordedByUser: { include: { user: { include: { profile: true } } } },
       },
     });
 
-    // Check for critical values and broadcast
-    const isCritical = this.checkCriticalVitals(vital);
-    
-    // Broadcast vitals update
-    this.websocketGateway.broadcastVitalsUpdate({
-      patientId: vital.patientId,
-      doctorId: vital.patient.assignedDoctors[0]?.doctor?.id,
-      vitalId: vital.id,
-      type: vital.type,
-      value: vital.value,
-      unit: vital.unit,
-      recordedAt: vital.recordedAt,
-      patientName: `${vital.patient.user.profile?.firstName} ${vital.patient.user.profile?.lastName}`,
-      isCritical,
-    });
-
-    // Send critical alert if needed
-    if (isCritical) {
-      this.websocketGateway.broadcastCriticalAlert({
-        type: 'CRITICAL_VITALS',
-        severity: 'CRITICAL',
-        patientId: vital.patientId,
-        patientName: `${vital.patient.user.profile?.firstName} ${vital.patient.user.profile?.lastName}`,
-        vitalType: vital.type,
-        value: vital.value,
-        unit: vital.unit,
-        message: `Critical ${vital.type.toLowerCase().replace('_', ' ')} detected: ${vital.value} ${vital.unit}`,
-      });
-    }
+    // Check for critical values and send alerts
+    await this.checkCriticalValues(vital);
 
     return vital;
   }
 
-  private checkCriticalVitals(vital: any): boolean {
-    const { type, value } = vital;
-    const numericValue = parseFloat(value);
+  async findPatientVitals(patientId: string, type?: string, page = 1, limit = 20) {
+    const skip = (page - 1) * limit;
+    let whereClause: any = { patientId, isDeleted: false };
 
-    switch (type) {
-      case 'BLOOD_PRESSURE':
-        // Check for hypertensive crisis (>180/120)
-        const bpMatch = value.match(/(\d+)\/(\d+)/);
-        if (bpMatch) {
-          const systolic = parseInt(bpMatch[1]);
-          const diastolic = parseInt(bpMatch[2]);
-          return systolic > 180 || diastolic > 120;
-        }
-        return false;
-      
-      case 'HEART_RATE':
-        return numericValue > 120 || numericValue < 50;
-      
-      case 'OXYGEN_SATURATION':
-        return numericValue < 90;
-      
-      case 'BLOOD_SUGAR':
-        return numericValue > 300 || numericValue < 50;
-      
-      case 'TEMPERATURE':
-        return numericValue > 103 || numericValue < 95;
-      
-      default:
-        return false;
+    if (type) {
+      whereClause.type = type;
     }
-  }
 
-  async findByPatient(patientId: string) {
-    return this.prisma.vital.findMany({
-      where: { patientId },
-      orderBy: { recordedAt: 'desc' },
-      include: {
-        patient: { include: { user: { include: { profile: true } } } },
+    const [vitals, total] = await Promise.all([
+      this.prisma.vital.findMany({
+        where: whereClause,
+        include: {
+          recordedByUser: { include: { user: { include: { profile: true } } } },
+        },
+        orderBy: { recordedAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.vital.count({ where: whereClause }),
+    ]);
+
+    return {
+      vitals,
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit),
       },
-    });
+    };
   }
 
   async getLatestVitals(patientId: string) {
-    const vitals = await this.prisma.vital.findMany({
-      where: { patientId },
-      orderBy: { recordedAt: 'desc' },
-      take: 10,
-    });
+    const vitalTypes = ['BLOOD_PRESSURE', 'HEART_RATE', 'OXYGEN_SATURATION', 'BLOOD_SUGAR', 'TEMPERATURE'];
+    
+    const latestVitals = await Promise.all(
+      vitalTypes.map(async (type) => {
+        const vital = await this.prisma.vital.findFirst({
+          where: { patientId, type, isDeleted: false },
+          orderBy: { recordedAt: 'desc' },
+          include: {
+            recordedByUser: { include: { user: { include: { profile: true } } } },
+          },
+        });
+        return { type, vital };
+      })
+    );
 
-    const groupedVitals = vitals.reduce((acc, vital) => {
-      if (!acc[vital.type]) {
-        acc[vital.type] = vital;
-      }
-      return acc;
-    }, {});
-
-    return Object.values(groupedVitals);
+    return latestVitals.filter(item => item.vital !== null);
   }
 
-  async getVitalHistory(patientId: string, type: string) {
-    return this.prisma.vital.findMany({
-      where: { 
-        patientId,
-        type: type as any,
-      },
-      orderBy: { recordedAt: 'desc' },
-      take: 50,
+  async update(id: string, updateVitalsDto: UpdateVitalsDto, userId: string) {
+    const vital = await this.prisma.vital.findUnique({
+      where: { id },
     });
+
+    if (!vital) {
+      throw new NotFoundException('Vital record not found');
+    }
+
+    if (vital.recordedBy !== userId) {
+      throw new ForbiddenException('You can only update your own vital records');
+    }
+
+    return this.prisma.vital.update({
+      where: { id },
+      data: updateVitalsDto,
+      include: {
+        patient: { include: { user: { include: { profile: true } } } },
+        recordedByUser: { include: { user: { include: { profile: true } } } },
+      },
+    });
+  }
+
+  async delete(id: string, userId: string) {
+    const vital = await this.prisma.vital.findUnique({
+      where: { id },
+    });
+
+    if (!vital) {
+      throw new NotFoundException('Vital record not found');
+    }
+
+    if (vital.recordedBy !== userId) {
+      throw new ForbiddenException('You can only delete your own vital records');
+    }
+
+    return this.prisma.vital.update({
+      where: { id },
+      data: { isDeleted: true, deletedAt: new Date() },
+    });
+  }
+
+  private async checkCriticalValues(vital: any) {
+    let isCritical = false;
+    let alertMessage = '';
+
+    switch (vital.type) {
+      case 'BLOOD_PRESSURE':
+        const [systolic, diastolic] = vital.value.split('/').map(Number);
+        if (systolic > 180 || diastolic > 120) {
+          isCritical = true;
+          alertMessage = `Critical blood pressure: ${vital.value}`;
+        }
+        break;
+      case 'HEART_RATE':
+        const heartRate = Number(vital.value);
+        if (heartRate > 100 || heartRate < 60) {
+          isCritical = true;
+          alertMessage = `Abnormal heart rate: ${vital.value} bpm`;
+        }
+        break;
+      case 'OXYGEN_SATURATION':
+        const oxygen = Number(vital.value);
+        if (oxygen < 95) {
+          isCritical = true;
+          alertMessage = `Low oxygen saturation: ${vital.value}%`;
+        }
+        break;
+      case 'BLOOD_SUGAR':
+        const sugar = Number(vital.value);
+        if (sugar > 200 || sugar < 70) {
+          isCritical = true;
+          alertMessage = `Critical blood sugar: ${vital.value} mg/dL`;
+        }
+        break;
+    }
+
+    if (isCritical) {
+      // Notify patient's assigned doctors
+      const assignments = await this.prisma.doctorPatientAssignment.findMany({
+        where: { patientId: vital.patientId, isActive: true },
+        include: { doctor: { include: { user: true } } },
+      });
+
+      for (const assignment of assignments) {
+        await this.notificationService.createNotification({
+          userId: assignment.doctor.userId,
+          type: 'VITAL_ALERT',
+          title: 'Critical Vital Alert',
+          message: `${vital.patient.user.profile.firstName} ${vital.patient.user.profile.lastName}: ${alertMessage}`,
+          metadata: JSON.stringify({ vitalId: vital.id, patientId: vital.patientId }),
+        });
+      }
+    }
   }
 }
