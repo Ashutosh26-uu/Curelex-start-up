@@ -29,6 +29,10 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
+  
+  // Check if registering as patient from URL params
+  const [searchParams, setSearchParams] = useState('');
+  const isPatientRegistration = typeof window !== 'undefined' && window.location.search.includes('type=patient');
 
   const { register, handleSubmit, formState: { errors } } = useForm<RegisterForm>();
 
@@ -71,8 +75,12 @@ export default function RegisterPage() {
       <div className="max-w-2xl mx-auto">
         <div className="text-center mb-8">
           <Stethoscope className="h-12 w-12 text-primary-600 mx-auto" />
-          <h1 className="mt-4 text-3xl font-bold text-gray-900">Patient Registration</h1>
-          <p className="mt-2 text-gray-600">Join our healthcare platform - Made in India 🇮🇳</p>
+          <h1 className="mt-4 text-3xl font-bold text-gray-900">
+            {isPatientRegistration ? 'Patient Registration' : 'User Registration'}
+          </h1>
+          <p className="mt-2 text-gray-600">
+            {isPatientRegistration ? 'Register as a patient to access healthcare services' : 'Join our healthcare platform - Made in India 🇮🇳'}
+          </p>
         </div>
 
         <Card>
@@ -194,8 +202,20 @@ export default function RegisterPage() {
               />
 
               <Button type="submit" className="w-full" loading={loading}>
-                Register
+                {isPatientRegistration ? 'Register as Patient' : 'Register'}
               </Button>
+              
+              <div className="text-center mt-4">
+                <p className="text-sm text-gray-600">
+                  Already have an account?{' '}
+                  <a 
+                    href={isPatientRegistration ? "/patient-login" : "/login"} 
+                    className="text-primary-600 hover:text-primary-700 font-medium"
+                  >
+                    Sign in here
+                  </a>
+                </p>
+              </div>
             </form>
           </CardContent>
         </Card>

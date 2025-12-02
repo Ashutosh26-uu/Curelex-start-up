@@ -113,14 +113,31 @@ export default function LoginPage() {
                 Sign in
               </Button>
 
-              <div className="text-center mt-4">
+              <div className="text-center mt-4 space-y-3">
                 <p className="text-sm text-gray-600">
                   New patient?{' '}
-                  <a href="/register" className="text-primary-600 hover:text-primary-700 font-medium">
+                  <a href="/register?type=patient" className="text-primary-600 hover:text-primary-700 font-medium">
                     Register here
                   </a>
                 </p>
-
+                
+                <div className="border-t pt-3">
+                  <p className="text-xs text-gray-500 mb-2">Or use specific portals:</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <a
+                      href="/patient-login"
+                      className="text-xs bg-blue-50 text-blue-600 py-2 px-3 rounded text-center hover:bg-blue-100"
+                    >
+                      Patient Portal
+                    </a>
+                    <a
+                      href="/staff-login"
+                      className="text-xs bg-green-50 text-green-600 py-2 px-3 rounded text-center hover:bg-green-100"
+                    >
+                      Staff Portal
+                    </a>
+                  </div>
+                </div>
               </div>
             </form>
           </CardContent>

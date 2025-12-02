@@ -108,11 +108,13 @@ export default function PatientLoginPage() {
               <div className="text-center mt-4 space-y-2">
                 <p className="text-sm text-gray-600">
                   New patient?{' '}
-                  <a href="/register" className="text-primary-600 hover:text-primary-700 font-medium">
-                    Register here
+                  <a href="/register?type=patient" className="text-primary-600 hover:text-primary-700 font-medium">
+                    Register as Patient
                   </a>
                 </p>
-
+                <p className="text-xs text-gray-500">
+                  Staff member? <a href="/staff-login" className="text-green-600 hover:text-green-700">Staff Portal</a>
+                </p>
               </div>
             </form>
           </CardContent>
