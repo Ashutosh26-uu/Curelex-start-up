@@ -12,81 +12,89 @@ export class NotificationService {
     private smsService: SmsService,
   ) {}
 
-  async create(createNotificationDto: CreateNotificationDto) {
-    const notification = await this.prisma.notification.create({
+  async createNotification(createNotificationDto: CreateNotificationDto) {
+    return this.prisma.notification.create({
       data: createNotificationDto,
     });
-
-    // Send notification based on type
-    if (createNotificationDto.type === 'EMAIL') {
-      await this.sendEmail(createNotificationDto);
-    } else if (createNotificationDto.type === 'SMS') {
-      await this.sendSms(createNotificationDto);
-    }
-
-    return notification;
   }
 
-  async findByUser(userId: string) {
-    return this.prisma.notification.findMany({
-      where: { userId },
-      orderBy: { sentAt: 'desc' },
-    });
-  }
+  async getUserNotifications(userId: string, page = 1, limit = 20) {
+    const skip = (page - 1) * limit;
+    
+    const [notifications, total] = await Promise.all([
+      this.prisma.notification.findMany({
+        where: { userId, isDeleted: false },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.notification.count({
+        where: { userId, isDeleted: false },
+      }),
+    ]);
 
-  async markAsRead(id: string) {
-    return this.prisma.notification.update({
-      where: { id },
-      data: { isRead: true },
-    });
-  }
-
-  private async sendEmail(notification: CreateNotificationDto) {
-    const user = await this.prisma.user.findUnique({
-      where: { id: notification.userId },
-      include: { profile: true },
-    });
-
-    if (user?.email) {
-      await this.emailService.sendEmail({
-        to: user.email,
-        subject: notification.title,
-        text: notification.message,
-      });
-    }
-  }
-
-  private async sendSms(notification: CreateNotificationDto) {
-    const user = await this.prisma.user.findUnique({
-      where: { id: notification.userId },
-      include: { profile: true },
-    });
-
-    if (user?.profile?.phone) {
-      await this.smsService.sendSms({
-        to: user.profile.phone,
-        message: `${notification.title}: ${notification.message}`,
-      });
-    }
-  }
-
-  async sendAppointmentReminder(appointmentId: string) {
-    const appointment = await this.prisma.appointment.findUnique({
-      where: { id: appointmentId },
-      include: {
-        patient: { include: { user: { include: { profile: true } } } },
-        doctor: { include: { user: { include: { profile: true } } } },
+    return {
+      notifications,
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit),
       },
+    };
+  }
+
+  async markAsRead(notificationId: string, userId: string) {
+    return this.prisma.notification.update({
+      where: { id: notificationId, userId },
+      data: { isRead: true, readAt: new Date() },
+    });
+  }
+
+  async sendWelcomeNotification(userId: string, firstName: string) {
+    await this.createNotification({
+      userId,
+      type: 'WELCOME',
+      title: 'Welcome to Healthcare Platform',
+      message: `Welcome ${firstName}! Your account has been created successfully.`,
+    });
+  }
+
+  async sendAppointmentNotification(userId: string, appointmentData: any) {
+    await this.createNotification({
+      userId,
+      type: 'APPOINTMENT',
+      title: 'Appointment Scheduled',
+      message: `Your appointment has been scheduled for ${appointmentData.scheduledAt}`,
+      metadata: JSON.stringify(appointmentData),
+    });
+  }
+
+  async sendPasswordResetEmail(email: string, resetToken: string) {
+    const resetLink = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
+    
+    await this.emailService.sendEmail({
+      to: email,
+      subject: 'Password Reset Request',
+      html: `
+        <h2>Password Reset</h2>
+        <p>Click the link below to reset your password:</p>
+        <a href="${resetLink}">Reset Password</a>
+        <p>This link expires in 15 minutes.</p>
+      `,
+    });
+  }
+
+  async sendAppointmentReminder(patientId: string, appointmentData: any) {
+    const patient = await this.prisma.patient.findUnique({
+      where: { id: patientId },
+      include: { user: { include: { profile: true } } },
     });
 
-    if (appointment) {
-      const message = `Reminder: You have an appointment with Dr. ${appointment.doctor.user.profile.firstName} ${appointment.doctor.user.profile.lastName} on ${appointment.scheduledAt}`;
-      
-      await this.create({
-        userId: appointment.patient.userId,
-        type: 'EMAIL',
-        title: 'Appointment Reminder',
-        message,
+    if (patient?.user.profile?.phone) {
+      await this.smsService.sendSms({
+        to: patient.user.profile.phone,
+        message: `Reminder: You have an appointment scheduled for ${appointmentData.scheduledAt}`,
       });
     }
   }

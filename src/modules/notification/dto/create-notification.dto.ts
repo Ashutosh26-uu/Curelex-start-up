@@ -1,14 +1,22 @@
-import { IsString, IsEnum, IsOptional, IsObject } from 'class-validator';
+import { IsString, IsOptional, IsEnum } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
+
+export enum NotificationType {
+  WELCOME = 'WELCOME',
+  APPOINTMENT = 'APPOINTMENT',
+  PRESCRIPTION = 'PRESCRIPTION',
+  VITAL_ALERT = 'VITAL_ALERT',
+  SYSTEM = 'SYSTEM',
+}
 
 export class CreateNotificationDto {
   @ApiProperty()
   @IsString()
   userId: string;
 
-  @ApiProperty()
-  @IsString()
-  type: string; // EMAIL, SMS, PUSH
+  @ApiProperty({ enum: NotificationType })
+  @IsEnum(NotificationType)
+  type: NotificationType;
 
   @ApiProperty()
   @IsString()
@@ -20,6 +28,6 @@ export class CreateNotificationDto {
 
   @ApiProperty({ required: false })
   @IsOptional()
-  @IsObject()
-  metadata?: any;
+  @IsString()
+  metadata?: string;
 }

@@ -1,60 +1,55 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { google } from 'googleapis';
 
 @Injectable()
 export class GoogleMeetService {
-  private calendar;
+  constructor(private configService: ConfigService) {}
 
-  constructor(private configService: ConfigService) {
-    const auth = new google.auth.OAuth2(
-      this.configService.get('GOOGLE_CLIENT_ID'),
-      this.configService.get('GOOGLE_CLIENT_SECRET'),
-      this.configService.get('GOOGLE_REDIRECT_URI'),
-    );
-
-    this.calendar = google.calendar({ version: 'v3', auth });
-  }
-
-  async createMeeting(options: {
-    summary: string;
-    startTime: string;
+  async createMeetingLink(appointmentData: {
+    title: string;
+    startTime: Date;
     duration: number;
-  }): Promise<string> {
+    attendees: string[];
+  }) {
     try {
-      const startTime = new Date(options.startTime);
-      const endTime = new Date(startTime.getTime() + options.duration * 60000);
-
-      const event = {
-        summary: options.summary,
-        start: {
-          dateTime: startTime.toISOString(),
-          timeZone: 'UTC',
-        },
-        end: {
-          dateTime: endTime.toISOString(),
-          timeZone: 'UTC',
-        },
-        conferenceData: {
-          createRequest: {
-            requestId: `meet-${Date.now()}`,
-            conferenceSolutionKey: {
-              type: 'hangoutsMeet',
-            },
-          },
-        },
-      };
-
-      const response = await this.calendar.events.insert({
-        calendarId: 'primary',
-        resource: event,
-        conferenceDataVersion: 1,
+      // Mock Google Meet integration - replace with actual Google Calendar API
+      const meetingId = Math.random().toString(36).substring(2, 15);
+      const meetLink = `https://meet.google.com/${meetingId}`;
+      
+      console.log('Creating Google Meet link:', {
+        ...appointmentData,
+        meetLink,
       });
-
-      return response.data.conferenceData?.entryPoints?.[0]?.uri || 'https://meet.google.com/';
+      
+      return {
+        success: true,
+        meetLink,
+        meetingId,
+      };
     } catch (error) {
       console.error('Google Meet creation failed:', error);
-      return 'https://meet.google.com/'; // Fallback URL
+      return {
+        success: false,
+        error: error.message,
+      };
+    }
+  }
+
+  async updateMeeting(meetingId: string, updates: any) {
+    try {
+      console.log('Updating Google Meet:', meetingId, updates);
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  async deleteMeeting(meetingId: string) {
+    try {
+      console.log('Deleting Google Meet:', meetingId);
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error.message };
     }
   }
 }
