@@ -1,11 +1,12 @@
 import { Module } from '@nestjs/common';
 import { AppointmentController } from './appointment.controller';
 import { AppointmentService } from './appointment.service';
+import { PrismaModule } from '../../common/prisma/prisma.module';
 import { IntegrationModule } from '../integration/integration.module';
-import { WebSocketModule } from '../websocket/websocket.module';
+import { NotificationModule } from '../notification/notification.module';
 
 @Module({
-  imports: [IntegrationModule, WebSocketModule],
+  imports: [PrismaModule, IntegrationModule, NotificationModule],
   controllers: [AppointmentController],
   providers: [AppointmentService],
   exports: [AppointmentService],

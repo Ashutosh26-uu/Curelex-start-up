@@ -3,6 +3,8 @@ import { ConfigModule } from '@nestjs/config';
 import { CacheModule } from '@nestjs/cache-manager';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
+import { JwtModule } from '@nestjs/jwt';
+import { PassportModule } from '@nestjs/passport';
 import * as redisStore from 'cache-manager-redis-store';
 import { AppController } from './app.controller';
 
@@ -24,6 +26,12 @@ import { WebSocketModule } from './modules/websocket/websocket.module';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+    }),
+    PassportModule,
+    JwtModule.register({
+      global: true,
+      secret: process.env.JWT_SECRET || 'healthcare-secret',
+      signOptions: { expiresIn: '15m' },
     }),
     CacheModule.register({
       isGlobal: true,
