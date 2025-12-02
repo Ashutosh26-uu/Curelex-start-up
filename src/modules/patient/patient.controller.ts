@@ -1,72 +1,85 @@
-import { Controller, Get, Post, Body, Patch, Param, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, UseGuards, Request, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { PatientService } from './patient.service';
-import { CreatePatientDto } from './dto/create-patient.dto';
 import { UpdatePatientDto } from './dto/update-patient.dto';
-import { PatientRegisterDto } from './dto/patient-register.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
 
 @ApiTags('Patients')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('patients')
 export class PatientController {
-  constructor(private readonly patientService: PatientService) {}
-
-  @ApiOperation({ summary: 'Patient registration (public)' })
-  @Post('register')
-  async register(@Body() patientRegisterDto: PatientRegisterDto) {
-    return this.patientService.registerPatient(patientRegisterDto);
-  }
-
-  @ApiOperation({ summary: 'Create patient' })
-  @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN, UserRole.DOCTOR)
-  @Post()
-  async create(@Body() createPatientDto: CreatePatientDto) {
-    return this.patientService.create(createPatientDto);
-  }
+  constructor(private patientService: PatientService) {}
 
   @ApiOperation({ summary: 'Get all patients' })
-  @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN, UserRole.DOCTOR, UserRole.NURSE, UserRole.JUNIOR_DOCTOR)
   @Get()
-  async findAll() {
-    return { data: await this.patientService.findAll() };
+  @Roles(UserRole.DOCTOR, UserRole.NURSE, UserRole.ADMIN, UserRole.CEO, UserRole.CMO)
+  findAll(
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('search') search?: string,
+  ) {
+    return this.patientService.findAll(page, limit, search);
+  }
+
+  @ApiOperation({ summary: 'Get patient profile' })
+  @Get('me')
+  @Roles(UserRole.PATIENT)
+  getMyProfile(@Request() req: any) {
+    return this.patientService.findByUserId(req.user.id);
   }
 
   @ApiOperation({ summary: 'Get patient by ID' })
-  @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
   @Get(':id')
-  async findOne(@Param('id') id: string) {
+  @Roles(UserRole.DOCTOR, UserRole.NURSE, UserRole.ADMIN, UserRole.CEO, UserRole.CMO)
+  findOne(@Param('id') id: string) {
     return this.patientService.findOne(id);
   }
 
   @ApiOperation({ summary: 'Update patient' })
-  @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
   @Patch(':id')
-  async update(@Param('id') id: string, @Body() updatePatientDto: UpdatePatientDto) {
+  @Roles(UserRole.PATIENT, UserRole.DOCTOR, UserRole.NURSE, UserRole.ADMIN)
+  update(@Param('id') id: string, @Body() updatePatientDto: UpdatePatientDto) {
     return this.patientService.update(id, updatePatientDto);
   }
 
   @ApiOperation({ summary: 'Get patient medical history' })
-  @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
   @Get(':id/medical-history')
-  async getMedicalHistory(@Param('id') id: string) {
+  @Roles(UserRole.PATIENT, UserRole.DOCTOR, UserRole.NURSE, UserRole.ADMIN)
+  getMedicalHistory(@Param('id') id: string) {
     return this.patientService.getMedicalHistory(id);
   }
 
+  @ApiOperation({ summary: 'Add medical history entry' })
+  @Post(':id/medical-history')
+  @Roles(UserRole.DOCTOR, UserRole.ADMIN)
+  addMedicalHistory(
+    @Param('id') id: string,
+    @Body() historyData: {
+      condition: string;
+      diagnosis: string;
+      treatment?: string;
+      severity?: string;
+      diagnosedAt: string;
+    },
+  ) {
+    return this.patientService.addMedicalHistory(id, {
+      ...historyData,
+      diagnosedAt: new Date(historyData.diagnosedAt),
+    });
+  }
+
   @ApiOperation({ summary: 'Get patient past visits' })
-  @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
   @Get(':id/past-visits')
-  async getPastVisits(@Param('id') id: string) {
-    return this.patientService.getPastVisits(id);
+  @Roles(UserRole.PATIENT, UserRole.DOCTOR, UserRole.NURSE, UserRole.ADMIN)
+  getPastVisits(
+    @Param('id') id: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+  ) {
+    return this.patientService.getPastVisits(id, page, limit);
   }
 }

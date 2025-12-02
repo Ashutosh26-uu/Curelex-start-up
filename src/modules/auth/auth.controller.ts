@@ -1,4 +1,4 @@
-import { Controller, Post, Body, UseGuards, Request, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, Request, HttpCode, HttpStatus, Get } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
@@ -40,6 +40,14 @@ export class AuthController {
   @Post('logout')
   async logout(@Request() req: any) {
     return this.authService.logout(req.user.id);
+  }
+
+  @ApiOperation({ summary: 'Get current user profile' })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @Get('me')
+  async getProfile(@Request() req: any) {
+    return req.user;
   }
 
   @ApiOperation({ summary: 'Forgot password' })

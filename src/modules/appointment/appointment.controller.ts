@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, UseGuards, Request, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { AppointmentService } from './appointment.service';
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
@@ -25,8 +25,19 @@ export class AppointmentController {
   @ApiOperation({ summary: 'Get all appointments' })
   @Get()
   @Roles(UserRole.DOCTOR, UserRole.NURSE, UserRole.ADMIN)
-  findAll() {
-    return this.appointmentService.findAll();
+  findAll(
+    @Request() req: any,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+  ) {
+    return this.appointmentService.findAll(req.user.id, req.user.role, page, limit);
+  }
+
+  @ApiOperation({ summary: 'Get upcoming appointments' })
+  @Get('upcoming/me')
+  @Roles(UserRole.PATIENT, UserRole.DOCTOR)
+  getUpcoming(@Request() req: any) {
+    return this.appointmentService.getUpcoming(req.user.id, req.user.role);
   }
 
   @ApiOperation({ summary: 'Get appointment by ID' })
@@ -43,10 +54,24 @@ export class AppointmentController {
     return this.appointmentService.update(id, updateAppointmentDto);
   }
 
-  @ApiOperation({ summary: 'Get upcoming appointments' })
-  @Get('upcoming/me')
-  @Roles(UserRole.PATIENT, UserRole.DOCTOR)
-  getUpcomingAppointments(@Request() req) {
-    return this.appointmentService.getUpcomingAppointments(req.user.id, req.user.role);
+  @ApiOperation({ summary: 'Cancel appointment' })
+  @Patch(':id/cancel')
+  cancel(@Param('id') id: string, @Body('reason') reason: string) {
+    return this.appointmentService.cancel(id, reason);
+  }
+
+  @ApiOperation({ summary: 'Complete appointment' })
+  @Patch(':id/complete')
+  @Roles(UserRole.DOCTOR)
+  complete(
+    @Param('id') id: string,
+    @Body('diagnosis') diagnosis?: string,
+    @Body('followUpDate') followUpDate?: string,
+  ) {
+    return this.appointmentService.complete(
+      id,
+      diagnosis,
+      followUpDate ? new Date(followUpDate) : undefined,
+    );
   }
 }

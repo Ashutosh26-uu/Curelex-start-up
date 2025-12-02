@@ -1,7 +1,8 @@
-import { Controller, Get, Post, Body, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Request, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { VitalsService } from './vitals.service';
 import { CreateVitalDto } from './dto/create-vital.dto';
+import { UpdateVitalsDto } from './dto/update-vitals.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -16,32 +17,45 @@ export class VitalsController {
 
   @ApiOperation({ summary: 'Record vital signs' })
   @Post()
-  @Roles(UserRole.JUNIOR_DOCTOR, UserRole.NURSE, UserRole.DOCTOR)
-  create(@Body() createVitalDto: CreateVitalDto) {
-    return this.vitalsService.create(createVitalDto);
+  @Roles(UserRole.DOCTOR, UserRole.JUNIOR_DOCTOR, UserRole.NURSE)
+  create(@Body() createVitalDto: CreateVitalDto, @Request() req: any) {
+    return this.vitalsService.create(createVitalDto, req.user.id);
   }
 
   @ApiOperation({ summary: 'Get patient vitals' })
   @Get('patient/:patientId')
-  @Roles(UserRole.PATIENT, UserRole.DOCTOR, UserRole.JUNIOR_DOCTOR, UserRole.NURSE, UserRole.ADMIN)
-  findByPatient(@Param('patientId') patientId: string) {
-    return this.vitalsService.findByPatient(patientId);
+  @Roles(UserRole.DOCTOR, UserRole.JUNIOR_DOCTOR, UserRole.NURSE, UserRole.ADMIN)
+  getPatientVitals(
+    @Param('patientId') patientId: string,
+    @Query('type') type?: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+  ) {
+    return this.vitalsService.findPatientVitals(patientId, type, page, limit);
   }
 
   @ApiOperation({ summary: 'Get latest vitals for patient' })
   @Get('patient/:patientId/latest')
-  @Roles(UserRole.PATIENT, UserRole.DOCTOR, UserRole.JUNIOR_DOCTOR, UserRole.NURSE, UserRole.ADMIN)
+  @Roles(UserRole.DOCTOR, UserRole.JUNIOR_DOCTOR, UserRole.NURSE, UserRole.ADMIN)
   getLatestVitals(@Param('patientId') patientId: string) {
     return this.vitalsService.getLatestVitals(patientId);
   }
 
-  @ApiOperation({ summary: 'Get vital history by type' })
-  @Get('patient/:patientId/history')
-  @Roles(UserRole.PATIENT, UserRole.DOCTOR, UserRole.JUNIOR_DOCTOR, UserRole.NURSE, UserRole.ADMIN)
-  getVitalHistory(
-    @Param('patientId') patientId: string,
-    @Query('type') type: string,
+  @ApiOperation({ summary: 'Update vital record' })
+  @Patch(':id')
+  @Roles(UserRole.DOCTOR, UserRole.JUNIOR_DOCTOR, UserRole.NURSE)
+  update(
+    @Param('id') id: string,
+    @Body() updateVitalsDto: UpdateVitalsDto,
+    @Request() req: any,
   ) {
-    return this.vitalsService.getVitalHistory(patientId, type);
+    return this.vitalsService.update(id, updateVitalsDto, req.user.id);
+  }
+
+  @ApiOperation({ summary: 'Delete vital record' })
+  @Delete(':id')
+  @Roles(UserRole.DOCTOR, UserRole.JUNIOR_DOCTOR, UserRole.NURSE, UserRole.ADMIN)
+  delete(@Param('id') id: string, @Request() req: any) {
+    return this.vitalsService.delete(id, req.user.id);
   }
 }
