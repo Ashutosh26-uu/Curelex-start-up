@@ -1,4 +1,4 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import { Controller, Get, UseGuards, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { OfficerService } from './officer.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -13,66 +13,50 @@ import { UserRole } from '../../common/enums/user-role.enum';
 export class OfficerController {
   constructor(private officerService: OfficerService) {}
 
-  @ApiOperation({ summary: 'Get dashboard analytics' })
+  @ApiOperation({ summary: 'Get dashboard statistics' })
   @Get('dashboard')
-  @Roles(UserRole.CEO, UserRole.CTO, UserRole.CFO, UserRole.CMO, UserRole.ADMIN)
-  getDashboardAnalytics() {
-    return this.officerService.getDashboardAnalytics();
+  @Roles(UserRole.CEO, UserRole.CTO, UserRole.CFO, UserRole.CMO)
+  getDashboardStats() {
+    return this.officerService.getDashboardStats();
   }
 
   @ApiOperation({ summary: 'Get appointment analytics' })
   @Get('analytics/appointments')
-  @Roles(UserRole.CEO, UserRole.CTO, UserRole.CFO, UserRole.CMO, UserRole.ADMIN)
-  getAppointmentAnalytics() {
-    return this.officerService.getAppointmentAnalytics();
+  @Roles(UserRole.CEO, UserRole.CTO, UserRole.CFO, UserRole.CMO)
+  getAppointmentAnalytics(
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.officerService.getAppointmentAnalytics(
+      startDate ? new Date(startDate) : undefined,
+      endDate ? new Date(endDate) : undefined,
+    );
   }
 
   @ApiOperation({ summary: 'Get patient analytics' })
   @Get('analytics/patients')
-  @Roles(UserRole.CEO, UserRole.CTO, UserRole.CFO, UserRole.CMO, UserRole.ADMIN)
+  @Roles(UserRole.CEO, UserRole.CTO, UserRole.CFO, UserRole.CMO)
   getPatientAnalytics() {
     return this.officerService.getPatientAnalytics();
   }
 
-  @ApiOperation({ summary: 'Get doctor analytics' })
-  @Get('analytics/doctors')
-  @Roles(UserRole.CEO, UserRole.CTO, UserRole.CFO, UserRole.CMO, UserRole.ADMIN)
-  getDoctorAnalytics() {
-    return this.officerService.getDoctorAnalytics();
+  @ApiOperation({ summary: 'Get revenue analytics' })
+  @Get('analytics/revenue')
+  @Roles(UserRole.CEO, UserRole.CFO)
+  getRevenueAnalytics(
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.officerService.getRevenueAnalytics(
+      startDate ? new Date(startDate) : undefined,
+      endDate ? new Date(endDate) : undefined,
+    );
   }
 
-  @ApiOperation({ summary: 'Get total patients today' })
-  @Get('metrics/patients-today')
-  @Roles(UserRole.CEO, UserRole.CTO, UserRole.CFO, UserRole.CMO, UserRole.ADMIN)
-  getPatientsToday() {
-    return this.officerService.getPatientsToday();
-  }
-
-  @ApiOperation({ summary: 'Get pending assignments' })
-  @Get('metrics/pending-assignments')
-  @Roles(UserRole.CEO, UserRole.CTO, UserRole.CFO, UserRole.CMO, UserRole.ADMIN)
-  getPendingAssignments() {
-    return this.officerService.getPendingAssignments();
-  }
-
-  @ApiOperation({ summary: 'Get doctor performance metrics' })
-  @Get('metrics/doctor-performance')
-  @Roles(UserRole.CEO, UserRole.CTO, UserRole.CFO, UserRole.CMO, UserRole.ADMIN)
-  getDoctorPerformance() {
-    return this.officerService.getDoctorPerformance();
-  }
-
-  @ApiOperation({ summary: 'Get appointment completion trends' })
-  @Get('metrics/completion-trends')
-  @Roles(UserRole.CEO, UserRole.CTO, UserRole.CFO, UserRole.CMO, UserRole.ADMIN)
-  getCompletionTrends() {
-    return this.officerService.getCompletionTrends();
-  }
-
-  @ApiOperation({ summary: 'Get alerts and escalations' })
-  @Get('metrics/alerts')
-  @Roles(UserRole.CEO, UserRole.CTO, UserRole.CFO, UserRole.CMO, UserRole.ADMIN)
-  getAlerts() {
-    return this.officerService.getAlerts();
+  @ApiOperation({ summary: 'Get system health metrics' })
+  @Get('system/health')
+  @Roles(UserRole.CEO, UserRole.CTO)
+  getSystemHealth() {
+    return this.officerService.getSystemHealth();
   }
 }

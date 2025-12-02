@@ -9,35 +9,50 @@ export class AuditInterceptor implements NestInterceptor {
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
     const request = context.switchToHttp().getRequest();
-    const { user, method, url, ip, headers } = request;
+    const { method, url, user, ip, headers } = request;
+    const userAgent = headers['user-agent'];
+    
+    const action = `${method} ${url}`;
+    const resource = this.extractResource(url);
 
-    if (user && this.shouldAudit(method, url)) {
-      const action = `${method} ${url}`;
-      const resource = this.extractResource(url);
-
-      return next.handle().pipe(
-        tap(() => {
+    return next.handle().pipe(
+      tap({
+        next: (response) => {
           this.loggingService.createAuditLog({
-            userId: user.id,
-            action,
+            userId: user?.id,
+            action: `${action} - SUCCESS`,
             resource,
+            details: JSON.stringify({ 
+              method, 
+              url, 
+              statusCode: 200,
+              responseSize: JSON.stringify(response).length 
+            }),
             ipAddress: ip,
-            userAgent: headers['user-agent'],
+            userAgent,
           });
-        }),
-      );
-    }
-
-    return next.handle();
-  }
-
-  private shouldAudit(method: string, url: string): boolean {
-    // Audit all POST, PUT, PATCH, DELETE operations
-    return ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method);
+        },
+        error: (error) => {
+          this.loggingService.createAuditLog({
+            userId: user?.id,
+            action: `${action} - ERROR`,
+            resource,
+            details: JSON.stringify({ 
+              method, 
+              url, 
+              error: error.message,
+              statusCode: error.status || 500 
+            }),
+            ipAddress: ip,
+            userAgent,
+          });
+        },
+      }),
+    );
   }
 
   private extractResource(url: string): string {
-    const segments = url.split('/');
-    return segments[2] || 'unknown'; // Extract resource from /api/v1/resource
+    const segments = url.split('/').filter(Boolean);
+    return segments[2] || segments[1] || 'unknown';
   }
 }

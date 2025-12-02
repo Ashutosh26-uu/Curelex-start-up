@@ -1,51 +1,61 @@
 import {
   WebSocketGateway,
   WebSocketServer,
+  SubscribeMessage,
   OnGatewayConnection,
   OnGatewayDisconnect,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { Injectable } from '@nestjs/common';
+import { UseGuards } from '@nestjs/common';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 
-@Injectable()
 @WebSocketGateway({
   cors: {
     origin: '*',
   },
 })
-export class WebSocketGatewayService implements OnGatewayConnection, OnGatewayDisconnect {
+export class WebSocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
   server: Server;
+
+  private connectedUsers = new Map<string, string>(); // socketId -> userId
 
   handleConnection(client: Socket) {
     console.log(`Client connected: ${client.id}`);
   }
 
   handleDisconnect(client: Socket) {
-    console.log(`Client disconnected: ${client.id}`);
+    const userId = this.connectedUsers.get(client.id);
+    if (userId) {
+      this.connectedUsers.delete(client.id);
+      console.log(`User ${userId} disconnected`);
+    }
   }
 
-  emitNewPatientRegistered(patientData: any) {
-    this.server.emit('new-patient-registered', patientData);
+  @SubscribeMessage('join')
+  handleJoin(client: Socket, payload: { userId: string }) {
+    this.connectedUsers.set(client.id, payload.userId);
+    client.join(`user_${payload.userId}`);
+    console.log(`User ${payload.userId} joined`);
   }
 
-  broadcastAppointmentScheduled(data: any) {
-    this.server.emit('appointment:scheduled', data);
+  // Send notification to specific user
+  sendNotificationToUser(userId: string, notification: any) {
+    this.server.to(`user_${userId}`).emit('notification', notification);
   }
 
-  sendToUser(userId: string, event: string, data: any) {
-    this.server.to(userId).emit(event, data);
+  // Send appointment reminder
+  sendAppointmentReminder(userId: string, appointment: any) {
+    this.server.to(`user_${userId}`).emit('appointment_reminder', appointment);
   }
 
-  broadcastVitalsUpdate(data: any) {
-    this.server.emit('vitals:updated', data);
+  // Send vital alert
+  sendVitalAlert(userId: string, alert: any) {
+    this.server.to(`user_${userId}`).emit('vital_alert', alert);
   }
 
-  broadcastCriticalAlert(data: any) {
-    this.server.emit('critical:alert', data);
-  }
-
-  broadcastNewPatientRegistration(data: any) {
-    this.server.emit('patient:registered', data);
+  // Broadcast system message
+  broadcastSystemMessage(message: any) {
+    this.server.emit('system_message', message);
   }
 }
