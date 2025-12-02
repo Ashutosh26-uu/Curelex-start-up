@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { Button } from '@/components/ui/Button';
@@ -20,7 +20,6 @@ interface RegisterForm {
   mobile: string;
   email: string;
   emergencyContact: string;
-  symptoms: string;
   identificationNumber: string;
 }
 
@@ -29,12 +28,13 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
-  
-  // Check if registering as patient from URL params
-  const [searchParams, setSearchParams] = useState('');
-  const isPatientRegistration = typeof window !== 'undefined' && window.location.search.includes('type=patient');
+  const [isPatientRegistration, setIsPatientRegistration] = useState(false);
 
   const { register, handleSubmit, formState: { errors } } = useForm<RegisterForm>();
+
+  useEffect(() => {
+    setIsPatientRegistration(window.location.search.includes('type=patient'));
+  }, []);
 
   const onSubmit = async (data: RegisterForm) => {
     setLoading(true);
@@ -194,12 +194,7 @@ export default function RegisterPage() {
                 error={errors.emergencyContact?.message}
               />
 
-              <Textarea
-                label="Current Symptoms"
-                placeholder="Describe your current symptoms..."
-                {...register('symptoms')}
-                error={errors.symptoms?.message}
-              />
+
 
               <Button type="submit" className="w-full" loading={loading}>
                 {isPatientRegistration ? 'Register as Patient' : 'Register'}

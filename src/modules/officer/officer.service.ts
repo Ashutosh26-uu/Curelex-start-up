@@ -103,7 +103,6 @@ export class OfficerService {
       totalPatients,
       patientsByStatus,
       patientsByMonth,
-      averageAge,
     ] = await Promise.all([
       this.prisma.patient.count({ where: { isDeleted: false } }),
       this.prisma.patient.groupBy({
@@ -117,15 +116,6 @@ export class OfficerService {
           isDeleted: false,
         },
         select: { createdAt: true },
-      }),
-      this.prisma.profile.aggregate({
-        where: {
-          dateOfBirth: { not: null },
-          user: { patient: { isNot: null } },
-        },
-        _avg: {
-          dateOfBirth: true,
-        },
       }),
     ]);
 
@@ -142,9 +132,7 @@ export class OfficerService {
         return acc;
       }, {} as Record<string, number>),
       monthlyRegistrations,
-      averageAge: averageAge._avg.dateOfBirth 
-        ? Math.floor((Date.now() - averageAge._avg.dateOfBirth.getTime()) / (365.25 * 24 * 60 * 60 * 1000))
-        : null,
+      averageAge: null,
     };
   }
 

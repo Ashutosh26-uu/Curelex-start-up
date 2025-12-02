@@ -1,13 +1,6 @@
 import { IsString, IsDateString, IsOptional, IsEnum } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
-
-export enum AppointmentStatus {
-  SCHEDULED = 'SCHEDULED',
-  IN_PROGRESS = 'IN_PROGRESS',
-  COMPLETED = 'COMPLETED',
-  CANCELLED = 'CANCELLED',
-  NO_SHOW = 'NO_SHOW',
-}
+import { AppointmentStatus } from '../../../common/enums/appointment-status.enum';
 
 export class UpdateAppointmentDto {
   @ApiProperty({ required: false })

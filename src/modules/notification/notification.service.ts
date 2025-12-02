@@ -54,7 +54,7 @@ export class NotificationService {
   async sendWelcomeNotification(userId: string, firstName: string) {
     await this.createNotification({
       userId,
-      type: 'WELCOME',
+      type: 'WELCOME' as any,
       title: 'Welcome to Healthcare Platform',
       message: `Welcome ${firstName}! Your account has been created successfully.`,
     });
@@ -63,7 +63,7 @@ export class NotificationService {
   async sendAppointmentNotification(userId: string, appointmentData: any) {
     await this.createNotification({
       userId,
-      type: 'APPOINTMENT',
+      type: 'APPOINTMENT' as any,
       title: 'Appointment Scheduled',
       message: `Your appointment has been scheduled for ${appointmentData.scheduledAt}`,
       metadata: JSON.stringify(appointmentData),

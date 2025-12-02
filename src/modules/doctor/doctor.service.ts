@@ -149,7 +149,7 @@ export class DoctorService {
     // Notify patient
     await this.notificationService.createNotification({
       userId: prescription.patient.userId,
-      type: 'PRESCRIPTION',
+      type: 'PRESCRIPTION' as any,
       title: 'New Prescription',
       message: `Dr. ${prescription.doctor.user.profile.firstName} has prescribed ${prescription.medication}`,
       metadata: JSON.stringify({ prescriptionId: prescription.id }),

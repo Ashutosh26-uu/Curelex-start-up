@@ -14,7 +14,7 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
     origin: '*',
   },
 })
-export class WebSocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
+export class HealthcareWebSocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
   server: Server;
 

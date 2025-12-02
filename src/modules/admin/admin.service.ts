@@ -14,16 +14,19 @@ export class AdminService {
     const { doctorId, patientId } = assignDoctorDto;
 
     // Verify doctor and patient exist
-    const [doctor, patient] = await Promise.all([
-      this.prisma.doctor.findUnique({
-        where: { id: doctorId },
-        include: { user: { include: { profile: true } } },
+    const [doctorUser, patientUser] = await Promise.all([
+      this.prisma.user.findFirst({
+        where: { doctor: { id: doctorId } },
+        include: { profile: true, doctor: true },
       }),
-      this.prisma.patient.findUnique({
-        where: { id: patientId },
-        include: { user: { include: { profile: true } } },
+      this.prisma.user.findFirst({
+        where: { patient: { id: patientId } },
+        include: { profile: true, patient: true },
       }),
     ]);
+
+    const doctor = doctorUser?.doctor;
+    const patient = patientUser?.patient;
 
     if (!doctor) {
       throw new NotFoundException('Doctor not found');
@@ -71,16 +74,16 @@ export class AdminService {
     // Send notifications
     await Promise.all([
       this.notificationService.createNotification({
-        userId: doctor.userId,
-        type: 'SYSTEM',
+        userId: doctorUser.id,
+        type: 'SYSTEM' as any,
         title: 'New Patient Assignment',
-        message: `You have been assigned to patient ${patient.user.profile.firstName} ${patient.user.profile.lastName}`,
+        message: `You have been assigned to patient ${patientUser.profile.firstName} ${patientUser.profile.lastName}`,
       }),
       this.notificationService.createNotification({
-        userId: patient.userId,
-        type: 'SYSTEM',
+        userId: patientUser.id,
+        type: 'SYSTEM' as any,
         title: 'Doctor Assignment',
-        message: `Dr. ${doctor.user.profile.firstName} ${doctor.user.profile.lastName} has been assigned as your doctor`,
+        message: `Dr. ${doctorUser.profile.firstName} ${doctorUser.profile.lastName} has been assigned as your doctor`,
       }),
     ]);
 

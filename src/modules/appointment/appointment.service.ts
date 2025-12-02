@@ -143,17 +143,17 @@ export class AppointmentService {
 
   async cancel(id: string, cancelReason: string) {
     return this.update(id, {
-      status: 'CANCELLED',
+      status: 'CANCELLED' as any,
       cancelReason,
     });
   }
 
   async complete(id: string, diagnosis?: string, followUpDate?: Date) {
     return this.update(id, {
-      status: 'COMPLETED',
-      completedAt: new Date(),
+      status: 'COMPLETED' as any,
+      completedAt: new Date().toISOString(),
       diagnosis,
-      followUpDate,
+      followUpDate: followUpDate?.toISOString(),
     });
   }
 

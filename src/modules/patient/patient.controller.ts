@@ -8,13 +8,19 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
 
 @ApiTags('Patients')
-@ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('patients')
 export class PatientController {
   constructor(private patientService: PatientService) {}
 
+  @ApiOperation({ summary: 'Register new patient' })
+  @Post('register')
+  register(@Body() patientData: any) {
+    return this.patientService.registerPatient(patientData);
+  }
+
   @ApiOperation({ summary: 'Get all patients' })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Get()
   @Roles(UserRole.DOCTOR, UserRole.NURSE, UserRole.ADMIN, UserRole.CEO, UserRole.CMO)
   findAll(
@@ -26,6 +32,8 @@ export class PatientController {
   }
 
   @ApiOperation({ summary: 'Get patient profile' })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Get('me')
   @Roles(UserRole.PATIENT)
   getMyProfile(@Request() req: any) {
@@ -33,6 +41,8 @@ export class PatientController {
   }
 
   @ApiOperation({ summary: 'Get patient by ID' })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Get(':id')
   @Roles(UserRole.DOCTOR, UserRole.NURSE, UserRole.ADMIN, UserRole.CEO, UserRole.CMO)
   findOne(@Param('id') id: string) {
@@ -40,6 +50,8 @@ export class PatientController {
   }
 
   @ApiOperation({ summary: 'Update patient' })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Patch(':id')
   @Roles(UserRole.PATIENT, UserRole.DOCTOR, UserRole.NURSE, UserRole.ADMIN)
   update(@Param('id') id: string, @Body() updatePatientDto: UpdatePatientDto) {
@@ -47,6 +59,8 @@ export class PatientController {
   }
 
   @ApiOperation({ summary: 'Get patient medical history' })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Get(':id/medical-history')
   @Roles(UserRole.PATIENT, UserRole.DOCTOR, UserRole.NURSE, UserRole.ADMIN)
   getMedicalHistory(@Param('id') id: string) {
@@ -54,6 +68,8 @@ export class PatientController {
   }
 
   @ApiOperation({ summary: 'Add medical history entry' })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Post(':id/medical-history')
   @Roles(UserRole.DOCTOR, UserRole.ADMIN)
   addMedicalHistory(
@@ -73,6 +89,8 @@ export class PatientController {
   }
 
   @ApiOperation({ summary: 'Get patient past visits' })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Get(':id/past-visits')
   @Roles(UserRole.PATIENT, UserRole.DOCTOR, UserRole.NURSE, UserRole.ADMIN)
   getPastVisits(

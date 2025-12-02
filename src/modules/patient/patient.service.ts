@@ -2,10 +2,43 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { CreatePatientDto } from './dto/create-patient.dto';
 import { UpdatePatientDto } from './dto/update-patient.dto';
+import * as bcrypt from 'bcryptjs';
 
 @Injectable()
 export class PatientService {
   constructor(private prisma: PrismaService) {}
+
+  async registerPatient(patientData: any) {
+    const hashedPassword = await bcrypt.hash(patientData.password || '123456', 12);
+    
+    return this.prisma.user.create({
+      data: {
+        email: patientData.email,
+        password: hashedPassword,
+        role: 'PATIENT',
+        profile: {
+          create: {
+            firstName: patientData.firstName || patientData.name?.split(' ')[0] || 'Patient',
+            lastName: patientData.lastName || patientData.name?.split(' ')[1] || 'User',
+            phone: patientData.mobile || patientData.phone,
+            gender: patientData.gender,
+          },
+        },
+        patient: {
+          create: {
+            patientId: `PAT-${Date.now()}`,
+            emergencyContact: patientData.emergencyContact,
+            emergencyPhone: patientData.emergencyPhone,
+            allergies: patientData.medicalHistory?.join(', ') || 'None',
+          },
+        },
+      },
+      include: {
+        profile: true,
+        patient: true,
+      },
+    });
+  }
 
   async findAll(page = 1, limit = 20, search?: string) {
     const skip = (page - 1) * limit;

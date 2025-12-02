@@ -179,7 +179,7 @@ export class VitalsService {
       for (const assignment of assignments) {
         await this.notificationService.createNotification({
           userId: assignment.doctor.userId,
-          type: 'VITAL_ALERT',
+          type: 'VITAL_ALERT' as any,
           title: 'Critical Vital Alert',
           message: `${vital.patient.user.profile.firstName} ${vital.patient.user.profile.lastName}: ${alertMessage}`,
           metadata: JSON.stringify({ vitalId: vital.id, patientId: vital.patientId }),

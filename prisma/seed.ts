@@ -128,10 +128,13 @@ async function main() {
   });
 
   // Assign Doctor to Patient
+  const doctorRecord = await prisma.doctor.findUnique({ where: { userId: doctor.id } });
+  const patientRecord = await prisma.patient.findUnique({ where: { userId: patient.id } });
+  
   await prisma.doctorPatientAssignment.create({
     data: {
-      doctorId: doctor.doctor.id,
-      patientId: patient.patient.id,
+      doctorId: doctorRecord.id,
+      patientId: patientRecord.id,
       assignedBy: admin.id,
     },
   });
@@ -143,8 +146,8 @@ async function main() {
 
   await prisma.appointment.create({
     data: {
-      patientId: patient.patient.id,
-      doctorId: doctor.doctor.id,
+      patientId: patientRecord.id,
+      doctorId: doctorRecord.id,
       scheduledAt: appointmentDate,
       duration: 30,
       status: 'SCHEDULED',
@@ -156,8 +159,8 @@ async function main() {
   // Create Sample Vitals
   await prisma.vital.create({
     data: {
-      patientId: patient.patient.id,
-      doctorId: doctor.doctor.id,
+      patientId: patientRecord.id,
+      doctorId: doctorRecord.id,
       type: 'BLOOD_PRESSURE',
       value: '120/80',
       unit: 'mmHg',
@@ -168,8 +171,8 @@ async function main() {
 
   await prisma.vital.create({
     data: {
-      patientId: patient.patient.id,
-      doctorId: doctor.doctor.id,
+      patientId: patientRecord.id,
+      doctorId: doctorRecord.id,
       type: 'HEART_RATE',
       value: '72',
       unit: 'bpm',
@@ -181,8 +184,8 @@ async function main() {
   // Create Sample Prescription
   await prisma.prescription.create({
     data: {
-      patientId: patient.patient.id,
-      doctorId: doctor.doctor.id,
+      patientId: patientRecord.id,
+      doctorId: doctorRecord.id,
       medication: 'Lisinopril',
       dosage: '10mg',
       frequency: 'Once daily',
@@ -195,7 +198,7 @@ async function main() {
   // Create Sample Medical History
   await prisma.medicalHistory.create({
     data: {
-      patientId: patient.patient.id,
+      patientId: patientRecord.id,
       condition: 'Hypertension',
       diagnosis: 'Essential hypertension',
       treatment: 'Lifestyle changes and medication',
