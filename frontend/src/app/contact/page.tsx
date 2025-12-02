@@ -3,8 +3,18 @@ import Navbar from '../../components/layout/Navbar';
 
 export default function Contact() {
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 relative">
+      <div 
+        className="fixed inset-0 opacity-5 pointer-events-none z-0"
+        style={{
+          backgroundImage: 'url(/images/crelex.jpg)',
+          backgroundRepeat: 'no-repeat',
+          backgroundPosition: 'center',
+          backgroundSize: '300px 300px'
+        }}
+      />
       <Navbar />
+      <div className="relative z-10">
       
       <div className="pt-16">
         <div className="max-w-7xl mx-auto py-16 px-4 sm:px-6 lg:px-8">
@@ -74,8 +84,7 @@ export default function Contact() {
                   </div>
                   <div>
                     <h3 className="font-medium text-gray-900">Email</h3>
-                    <p className="text-gray-600">contact@curelex.com</p>
-                    <p className="text-gray-600">support@curelex.com</p>
+                    <p className="text-gray-600">Contact.curelex@gmail.com</p>
                   </div>
                 </div>
 
@@ -87,8 +96,7 @@ export default function Contact() {
                   </div>
                   <div>
                     <h3 className="font-medium text-gray-900">Phone</h3>
-                    <p className="text-gray-600">+91 98765 43210</p>
-                    <p className="text-gray-600">+91 87654 32109</p>
+                    <p className="text-gray-600">+91 89578 09085</p>
                   </div>
                 </div>
 
@@ -102,9 +110,9 @@ export default function Contact() {
                     <h3 className="font-medium text-gray-900">Address</h3>
                     <p className="text-gray-600">
                       Curelex Health Tech Pvt. Ltd.<br />
-                      Technology Park, Sector 5<br />
-                      Bangalore, Karnataka 560001<br />
-                      India
+                      C/o Shiv Kumari Devi, Muhmmadpur Pachewara<br />
+                      Pachevara, Mirzapur, Chunar<br />
+                      Uttar Pradesh, India, 231305
                     </p>
                   </div>
                 </div>
@@ -118,14 +126,13 @@ export default function Contact() {
                   <div>
                     <h3 className="font-medium text-gray-900">Business Hours</h3>
                     <p className="text-gray-600">Monday - Friday: 9:00 AM - 6:00 PM</p>
-                    <p className="text-gray-600">Saturday: 10:00 AM - 4:00 PM</p>
-                    <p className="text-gray-600">Sunday: Closed</p>
                   </div>
                 </div>
               </div>
             </div>
           </div>
         </div>
+      </div>
       </div>
     </div>
   );

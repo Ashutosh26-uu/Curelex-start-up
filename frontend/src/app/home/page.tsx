@@ -3,8 +3,19 @@ import Navbar from '../../components/layout/Navbar';
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 relative">
+      {/* Background Watermark */}
+      <div 
+        className="fixed inset-0 opacity-5 pointer-events-none z-0"
+        style={{
+          backgroundImage: 'url(/images/crelex.jpg)',
+          backgroundRepeat: 'no-repeat',
+          backgroundPosition: 'center',
+          backgroundSize: '300px 300px'
+        }}
+      />
       <Navbar />
+      <div className="relative z-10">
       
       {/* Hero Section */}
       <div className="pt-16">
@@ -39,23 +50,47 @@ export default function Home() {
       </div>
 
       {/* About Section */}
-      <div className="bg-white py-16">
+      <div className="bg-white py-16 relative">
+        {/* Section Watermark */}
+        <div 
+          className="absolute inset-0 opacity-10 pointer-events-none z-0"
+          style={{
+            backgroundImage: 'url(/images/crelex.jpg)',
+            backgroundRepeat: 'no-repeat',
+            backgroundPosition: 'center',
+            backgroundSize: 'cover'
+          }}
+        />
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center">
             <h2 className="text-3xl font-bold text-gray-900 sm:text-4xl">
-              About Curelex Health Tech Pvt. Ltd.
+              About Us
             </h2>
           </div>
           <div className="mt-12 max-w-4xl mx-auto">
             <div className="text-lg text-gray-600 space-y-6">
               <p>
-                Curelex Health Tech Pvt. Ltd. is dedicated to building a modern, connected, and reliable digital healthcare ecosystem. We develop secure and user-friendly platforms that bring patients, doctors, diagnostic services, and corporate healthcare teams into a single, integrated environment. Our solutions are designed to simplify medical workflows, improve coordination, and support informed decisions at every stage of care.
+                Curelex is a next-generation hybrid e-clinic model designed to bring super-speciality healthcare, telemedicine, diagnostics, pathology, and pharmacy support to rural and semi-urban communities — without performing any invasive procedures. We provide pure OPD-based services focused on accurate consultation and timely treatment.
               </p>
               <p>
-                With a strong focus on engineering excellence, data security, and practical healthcare requirements, Curelex delivers systems that enhance efficiency and elevate the overall standard of patient experience. Our commitment is to make healthcare more accessible, transparent, and technologically advanced for individuals and institutions alike.
+                At Curelex, patients visit their nearest e-clinic where a qualified junior doctor performs physical examination, checks vitals, and documents medical history. During the same visit, the patient is connected to a super-specialist through secure telemedicine, ensuring expert diagnosis without travelling to big cities.
+              </p>
+              <p>
+                Curelex centres follow a zero-invasive care model (only OPD). For complete clinical support, we have partnerships with:
+              </p>
+              <ul className="list-disc list-inside space-y-2 ml-4">
+                <li>Pathology / laboratory service providers for sample collection and reporting</li>
+                <li>Nearby pharmacies for quick access to prescribed medicines</li>
+                <li>Hospitals for referral and admission only when required</li>
+              </ul>
+              <p>
+                This ensures that every patient gets the right doctor, right diagnosis, and right treatment at the right time, while maintaining full safety, transparency, and affordability.
+              </p>
+              <p>
+                We believe that quality healthcare should reach everyone, not just metropolitan cities. Curelex is committed to bridging the gap between rural and urban healthcare by combining modern telemedicine with physical doctor support for trustworthy, personalised care.
               </p>
               <p className="text-xl font-semibold text-blue-600">
-                At Curelex, we believe that technology should empower people to take control of their health with confidence—anywhere, anytime.
+                Curelex — Telemedicine that feels like offline care.
               </p>
             </div>
           </div>
@@ -103,6 +138,7 @@ export default function Home() {
             </div>
           </div>
         </div>
+      </div>
       </div>
     </div>
   );

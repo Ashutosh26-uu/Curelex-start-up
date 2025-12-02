@@ -10,8 +10,19 @@ export default function Navbar() {
         <div className="flex justify-between h-16">
           <div className="flex items-center">
             <Link href="/home" className="flex-shrink-0 flex items-center">
-              <span className="text-2xl font-bold text-blue-600">Curelex</span>
-              <span className="text-sm text-gray-500 ml-2">Health Tech</span>
+              <img 
+                src="/images/crelex.jpg" 
+                alt="Curelex Logo" 
+                className="h-10 w-auto mr-3"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                  e.currentTarget.nextElementSibling.style.display = 'flex';
+                }}
+              />
+              <div className="flex items-center">
+                <span className="text-2xl font-bold text-blue-600">Curelex</span>
+                <span className="text-sm text-gray-500 ml-2">Health Tech</span>
+              </div>
             </Link>
           </div>
 

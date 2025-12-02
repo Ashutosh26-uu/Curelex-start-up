@@ -3,8 +3,19 @@ import Navbar from '../../components/layout/Navbar';
 
 export default function Services() {
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 relative">
+      {/* Background Watermark */}
+      <div 
+        className="fixed inset-0 opacity-5 pointer-events-none z-0"
+        style={{
+          backgroundImage: 'url(/images/crelex.jpg)',
+          backgroundRepeat: 'no-repeat',
+          backgroundPosition: 'center',
+          backgroundSize: '300px 300px'
+        }}
+      />
       <Navbar />
+      <div className="relative z-10">
       
       <div className="pt-16">
         <div className="max-w-7xl mx-auto py-16 px-4 sm:px-6 lg:px-8">
@@ -112,6 +123,7 @@ export default function Services() {
             </div>
           </div>
         </div>
+      </div>
       </div>
     </div>
   );
