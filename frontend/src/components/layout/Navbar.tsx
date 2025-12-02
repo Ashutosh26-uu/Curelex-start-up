@@ -3,6 +3,7 @@ import { useState } from 'react';
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
+  const [imageError, setImageError] = useState(false);
 
   return (
     <nav className="bg-white shadow-lg fixed w-full top-0 z-50">
@@ -10,15 +11,14 @@ export default function Navbar() {
         <div className="flex justify-between h-16">
           <div className="flex items-center">
             <Link href="/home" className="flex-shrink-0 flex items-center">
-              <img 
-                src="/images/crelex.jpg" 
-                alt="Curelex Logo" 
-                className="h-10 w-auto mr-3"
-                onError={(e) => {
-                  e.currentTarget.style.display = 'none';
-                  e.currentTarget.nextElementSibling.style.display = 'flex';
-                }}
-              />
+              {!imageError && (
+                <img 
+                  src="/images/crelex.jpg" 
+                  alt="Curelex Logo" 
+                  className="h-10 w-auto mr-3"
+                  onError={() => setImageError(true)}
+                />
+              )}
               <div className="flex items-center">
                 <span className="text-2xl font-bold text-blue-600">Curelex</span>
                 <span className="text-sm text-gray-500 ml-2">Health Tech</span>
@@ -50,6 +50,8 @@ export default function Navbar() {
             <button
               onClick={() => setIsOpen(!isOpen)}
               className="text-gray-700 hover:text-blue-600 focus:outline-none"
+              aria-label={isOpen ? "Close menu" : "Open menu"}
+              title={isOpen ? "Close menu" : "Open menu"}
             >
               <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 {isOpen ? (

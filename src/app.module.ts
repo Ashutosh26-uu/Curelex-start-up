@@ -5,7 +5,6 @@ import { ThrottlerModule } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
-import * as redisStore from 'cache-manager-redis-store';
 import { AppController } from './app.controller';
 
 import { PrismaModule } from './common/prisma/prisma.module';
@@ -36,9 +35,6 @@ import { PrescriptionModule } from './modules/prescription/prescription.module';
     }),
     CacheModule.register({
       isGlobal: true,
-      store: redisStore as any,
-      host: process.env.REDIS_HOST || 'localhost',
-      port: parseInt(process.env.REDIS_PORT || '6379'),
       ttl: 300,
     }),
     ThrottlerModule.forRoot([{

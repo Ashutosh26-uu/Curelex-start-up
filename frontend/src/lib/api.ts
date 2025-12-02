@@ -9,7 +9,7 @@ class ApiClient {
 
   private async request(endpoint: string, options: RequestInit = {}) {
     const url = `${this.baseURL}${endpoint}`;
-    const token = localStorage.getItem('access_token');
+    const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
     
     const config: RequestInit = {
       headers: {
@@ -20,13 +20,19 @@ class ApiClient {
       ...options,
     };
 
-    const response = await fetch(url, config);
-    
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+    try {
+      const response = await fetch(url, config);
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+      }
+      
+      return response.json();
+    } catch (error) {
+      console.error('API Request failed:', error);
+      throw error;
     }
-    
-    return response.json();
   }
 
   get(endpoint: string) {
