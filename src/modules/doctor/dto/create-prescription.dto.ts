@@ -1,14 +1,16 @@
-import { IsString, IsOptional } from 'class-validator';
+import { IsString, IsDateString, IsOptional, IsEnum } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
+
+export enum PrescriptionStatus {
+  ACTIVE = 'ACTIVE',
+  COMPLETED = 'COMPLETED',
+  DISCONTINUED = 'DISCONTINUED',
+}
 
 export class CreatePrescriptionDto {
   @ApiProperty()
   @IsString()
   patientId: string;
-
-  @ApiProperty()
-  @IsString()
-  doctorId: string;
 
   @ApiProperty()
   @IsString()
@@ -30,4 +32,14 @@ export class CreatePrescriptionDto {
   @IsOptional()
   @IsString()
   instructions?: string;
+
+  @ApiProperty({ enum: PrescriptionStatus, default: PrescriptionStatus.ACTIVE })
+  @IsOptional()
+  @IsEnum(PrescriptionStatus)
+  status?: PrescriptionStatus;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsDateString()
+  endDate?: string;
 }

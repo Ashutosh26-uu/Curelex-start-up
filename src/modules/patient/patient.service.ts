@@ -1,230 +1,194 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
-import { NotificationService } from '../notification/notification.service';
-import { WebSocketGatewayService } from '../websocket/websocket.gateway';
 import { CreatePatientDto } from './dto/create-patient.dto';
 import { UpdatePatientDto } from './dto/update-patient.dto';
-import { PatientRegisterDto } from './dto/patient-register.dto';
-import { UserRole } from '../../common/enums/user-role.enum';
-import * as bcrypt from 'bcryptjs';
 
 @Injectable()
 export class PatientService {
-  constructor(
-    private prisma: PrismaService,
-    private notificationService: NotificationService,
-    private websocketGateway: WebSocketGatewayService,
-  ) {}
+  constructor(private prisma: PrismaService) {}
 
-  async create(createPatientDto: CreatePatientDto) {
-    return this.prisma.patient.create({
-      data: {
-        ...createPatientDto,
-        patientId: `PAT-${Date.now()}`,
-      },
-      include: {
-        user: { include: { profile: true } },
-      },
-    });
-  }
+  async findAll(page = 1, limit = 20, search?: string) {
+    const skip = (page - 1) * limit;
+    let whereClause: any = { isDeleted: false };
 
-  async findAll() {
-    return this.prisma.patient.findMany({
-      include: {
-        user: { include: { profile: true } },
-        appointments: true,
-        vitals: true,
+    if (search) {
+      whereClause = {
+        ...whereClause,
+        OR: [
+          { patientId: { contains: search } },
+          { user: { profile: { firstName: { contains: search } } } },
+          { user: { profile: { lastName: { contains: search } } } },
+          { user: { email: { contains: search } } },
+        ],
+      };
+    }
+
+    const [patients, total] = await Promise.all([
+      this.prisma.patient.findMany({
+        where: whereClause,
+        include: {
+          user: { include: { profile: true } },
+          assignedDoctors: {
+            where: { isActive: true },
+            include: { doctor: { include: { user: { include: { profile: true } } } } },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.patient.count({ where: whereClause }),
+    ]);
+
+    return {
+      patients,
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit),
       },
-    });
+    };
   }
 
   async findOne(id: string) {
-    return this.prisma.patient.findUnique({
+    const patient = await this.prisma.patient.findUnique({
       where: { id },
       include: {
         user: { include: { profile: true } },
-        appointments: { include: { doctor: { include: { user: { include: { profile: true } } } } } },
-        vitals: true,
-        medicalHistory: true,
-        prescriptions: { include: { doctor: { include: { user: { include: { profile: true } } } } } },
+        assignedDoctors: {
+          where: { isActive: true },
+          include: { doctor: { include: { user: { include: { profile: true } } } } },
+        },
+        appointments: {
+          orderBy: { scheduledAt: 'desc' },
+          take: 5,
+          include: { doctor: { include: { user: { include: { profile: true } } } } },
+        },
+        vitals: {
+          orderBy: { recordedAt: 'desc' },
+          take: 10,
+        },
+        medicalHistory: {
+          where: { isActive: true },
+          orderBy: { diagnosedAt: 'desc' },
+        },
+        prescriptions: {
+          where: { status: 'ACTIVE' },
+          orderBy: { prescribedAt: 'desc' },
+          include: { doctor: { include: { user: { include: { profile: true } } } } },
+        },
+      },
+    });
+
+    if (!patient) {
+      throw new NotFoundException('Patient not found');
+    }
+
+    return patient;
+  }
+
+  async findByUserId(userId: string) {
+    return this.prisma.patient.findUnique({
+      where: { userId },
+      include: {
+        user: { include: { profile: true } },
+        assignedDoctors: {
+          where: { isActive: true },
+          include: { doctor: { include: { user: { include: { profile: true } } } } },
+        },
       },
     });
   }
 
   async update(id: string, updatePatientDto: UpdatePatientDto) {
+    const patient = await this.findOne(id);
+
     return this.prisma.patient.update({
       where: { id },
       data: updatePatientDto,
       include: {
         user: { include: { profile: true } },
+        assignedDoctors: {
+          where: { isActive: true },
+          include: { doctor: { include: { user: { include: { profile: true } } } } },
+        },
       },
     });
   }
 
   async getMedicalHistory(patientId: string) {
     return this.prisma.medicalHistory.findMany({
-      where: { patientId },
+      where: { patientId, isDeleted: false },
       orderBy: { diagnosedAt: 'desc' },
     });
   }
 
-  async getPastVisits(patientId: string) {
-    return this.prisma.appointment.findMany({
-      where: { 
+  async addMedicalHistory(patientId: string, historyData: {
+    condition: string;
+    diagnosis: string;
+    treatment?: string;
+    severity?: string;
+    diagnosedAt: Date;
+  }) {
+    return this.prisma.medicalHistory.create({
+      data: {
         patientId,
-        status: 'COMPLETED',
+        ...historyData,
       },
-      include: {
-        doctor: { include: { user: { include: { profile: true } } } },
-      },
-      orderBy: { scheduledAt: 'desc' },
     });
   }
 
-  private generateUniquePatientId(identificationNumber: string): string {
-    // Generate unique patient ID based on identification number
-    const timestamp = Date.now().toString().slice(-6);
-    const idHash = identificationNumber.slice(-4);
-    return `PAT-${idHash}-${timestamp}`;
-  }
+  async getPastVisits(patientId: string, page = 1, limit = 20) {
+    const skip = (page - 1) * limit;
 
-  async registerPatient(patientRegisterDto: PatientRegisterDto) {
-    const { name, age, gender, mobile, email, medicalHistory, symptoms, emergencyContact } = patientRegisterDto;
-    
-    // Check if user already exists
-    const existingUser = await this.prisma.user.findUnique({
-      where: { email },
-    });
-
-    if (existingUser) {
-      throw new Error('User with this email already exists');
-    }
-
-    // Check if identification number already exists
-    const existingPatient = await this.prisma.patient.findFirst({
-      where: { 
-        OR: [
-          { emergencyContact: emergencyContact },
-          { patientId: { contains: mobile.slice(-4) } }
-        ]
-      },
-    });
-
-    if (existingPatient) {
-      throw new Error('Patient with this identification number already exists');
-    }
-
-    // Generate temporary password
-    const tempPassword = Math.random().toString(36).slice(-8);
-    const hashedPassword = await bcrypt.hash(tempPassword, 12);
-
-    // Split name into first and last name
-    const nameParts = name.split(' ');
-    const firstName = nameParts[0];
-    const lastName = nameParts.slice(1).join(' ') || '';
-
-    // Generate unique patient ID
-    const uniquePatientId = this.generateUniquePatientId(mobile);
-
-    // Create user and patient in transaction
-    const result = await this.prisma.$transaction(async (tx) => {
-      // Create user
-      const user = await tx.user.create({
-        data: {
-          email,
-          password: hashedPassword,
-          role: 'PATIENT',
-          profile: {
-            create: {
-              firstName,
-              lastName,
-              phone: `+91${mobile}`,
-              gender,
-              dateOfBirth: new Date(Date.now() - age * 365 * 24 * 60 * 60 * 1000),
-            },
-          },
-        },
-        include: { profile: true },
-      });
-
-      // Create patient with unique ID
-      const patient = await tx.patient.create({
-        data: {
-          userId: user.id,
-          patientId: uniquePatientId,
-          emergencyContact,
-          chronicConditions: symptoms,
-          // Store identification number in emergency contact field for now
-          emergencyPhone: emergencyContact,
+    const [visits, total] = await Promise.all([
+      this.prisma.appointment.findMany({
+        where: {
+          patientId,
+          status: 'COMPLETED',
+          isDeleted: false,
         },
         include: {
-          user: { include: { profile: true } },
+          doctor: { include: { user: { include: { profile: true } } } },
         },
-      });
+        orderBy: { completedAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.appointment.count({
+        where: {
+          patientId,
+          status: 'COMPLETED',
+          isDeleted: false,
+        },
+      }),
+    ]);
 
-      // Create medical history entries
-      if (medicalHistory && medicalHistory.length > 0) {
-        await tx.medicalHistory.createMany({
-          data: medicalHistory.map((condition) => ({
-            patientId: patient.id,
-            condition,
-            diagnosis: condition,
-            diagnosedAt: new Date(),
-          })),
-        });
-      }
-
-      return { user, patient, tempPassword, uniquePatientId };
-    });
-
-    // Broadcast WebSocket event
-    this.websocketGateway.broadcastNewPatientRegistration({
-      patientId: result.patient.id,
-      patientNumber: result.uniquePatientId,
-      name,
-      email,
-      age,
-      gender,
-      registeredAt: new Date(),
-    });
-
-    // Create notifications for officers
-    await this.createOfficerNotifications(result.patient, name);
-
-    const { password: _, ...userWithoutPassword } = result.user;
     return {
-      user: userWithoutPassword,
-      patient: result.patient,
-      tempPassword: result.tempPassword,
-      patientId: result.uniquePatientId,
+      visits,
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit),
+      },
     };
   }
 
-  private async createOfficerNotifications(patient: any, patientName: string) {
-    const officers = await this.prisma.user.findMany({
-      where: {
-        role: {
-          in: ['CEO', 'CTO', 'CFO', 'CMO'],
+  async getPatientStats() {
+    const [total, active, unassigned, newThisMonth] = await Promise.all([
+      this.prisma.patient.count({ where: { isDeleted: false } }),
+      this.prisma.patient.count({ where: { status: 'ACTIVE', isDeleted: false } }),
+      this.prisma.patient.count({ where: { status: 'UNASSIGNED', isDeleted: false } }),
+      this.prisma.patient.count({
+        where: {
+          createdAt: { gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1) },
+          isDeleted: false,
         },
-        isActive: true,
-      },
-    });
-
-    const notifications = officers.map((officer) => ({
-      userId: officer.id,
-      type: 'PUSH',
-      title: 'New Patient Registration',
-      message: `New patient ${patientName} has registered in the system.`,
-      metadata: JSON.stringify({
-        patientId: patient.id,
-        type: 'patient-registration',
       }),
-    }));
+    ]);
 
-    await Promise.all(
-      notifications.map((notification) =>
-        this.notificationService.create(notification),
-      ),
-    );
+    return { total, active, unassigned, newThisMonth };
   }
 }

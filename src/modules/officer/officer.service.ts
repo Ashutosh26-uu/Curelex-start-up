@@ -5,27 +5,46 @@ import { PrismaService } from '../../common/prisma/prisma.service';
 export class OfficerService {
   constructor(private prisma: PrismaService) {}
 
-  async getDashboardAnalytics() {
+  async getDashboardStats() {
     const [
       totalPatients,
       totalDoctors,
       totalAppointments,
-      todayAppointments,
       completedAppointments,
+      activeUsers,
+      newPatientsThisMonth,
+      appointmentsToday,
+      criticalVitals,
     ] = await Promise.all([
-      this.prisma.patient.count(),
-      this.prisma.doctor.count(),
-      this.prisma.appointment.count(),
+      this.prisma.patient.count({ where: { isDeleted: false } }),
+      this.prisma.doctor.count({ where: { isDeleted: false } }),
+      this.prisma.appointment.count({ where: { isDeleted: false } }),
+      this.prisma.appointment.count({ where: { status: 'COMPLETED', isDeleted: false } }),
+      this.prisma.user.count({ where: { isActive: true, isDeleted: false } }),
+      this.prisma.patient.count({
+        where: {
+          createdAt: { gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1) },
+          isDeleted: false,
+        },
+      }),
       this.prisma.appointment.count({
         where: {
           scheduledAt: {
             gte: new Date(new Date().setHours(0, 0, 0, 0)),
             lt: new Date(new Date().setHours(23, 59, 59, 999)),
           },
+          isDeleted: false,
         },
       }),
-      this.prisma.appointment.count({
-        where: { status: 'COMPLETED' },
+      this.prisma.vital.count({
+        where: {
+          recordedAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+          OR: [
+            { type: 'BLOOD_PRESSURE', value: { contains: '18' } }, // Simplified critical check
+            { type: 'HEART_RATE', value: { gt: '100' } },
+            { type: 'OXYGEN_SATURATION', value: { lt: '95' } },
+          ],
+        },
       }),
     ]);
 
@@ -33,153 +52,172 @@ export class OfficerService {
       totalPatients,
       totalDoctors,
       totalAppointments,
-      todayAppointments,
       completedAppointments,
+      activeUsers,
+      newPatientsThisMonth,
+      appointmentsToday,
+      criticalVitals,
       completionRate: totalAppointments > 0 ? (completedAppointments / totalAppointments) * 100 : 0,
     };
   }
 
-  async getAppointmentAnalytics() {
-    const appointmentsByStatus = await this.prisma.appointment.groupBy({
-      by: ['status'],
-      _count: { status: true },
+  async getAppointmentAnalytics(startDate?: Date, endDate?: Date) {
+    const start = startDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const end = endDate || new Date();
+
+    const appointments = await this.prisma.appointment.findMany({
+      where: {
+        scheduledAt: { gte: start, lte: end },
+        isDeleted: false,
+      },
+      select: {
+        status: true,
+        scheduledAt: true,
+        duration: true,
+      },
     });
 
-    const appointmentsByMonth = await this.prisma.appointment.groupBy({
-      by: ['scheduledAt'],
-      _count: { scheduledAt: true },
-      orderBy: { scheduledAt: 'asc' },
-    });
+    const statusCounts = appointments.reduce((acc, apt) => {
+      acc[apt.status] = (acc[apt.status] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    const dailyAppointments = appointments.reduce((acc, apt) => {
+      const date = apt.scheduledAt.toISOString().split('T')[0];
+      acc[date] = (acc[date] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
 
     return {
-      byStatus: appointmentsByStatus,
-      byMonth: appointmentsByMonth,
+      statusCounts,
+      dailyAppointments,
+      totalAppointments: appointments.length,
+      averageDuration: appointments.length > 0 
+        ? appointments.reduce((sum, apt) => sum + apt.duration, 0) / appointments.length 
+        : 0,
     };
   }
 
   async getPatientAnalytics() {
-    const patientsByMonth = await this.prisma.patient.groupBy({
-      by: ['createdAt'],
-      _count: { createdAt: true },
-      orderBy: { createdAt: 'asc' },
-    });
-
-    return { byMonth: patientsByMonth };
-  }
-
-  async getDoctorAnalytics() {
-    const doctorsBySpecialization = await this.prisma.doctor.groupBy({
-      by: ['specialization'],
-      _count: { specialization: true },
-    });
-
-    return { bySpecialization: doctorsBySpecialization };
-  }
-
-  async getPatientsToday() {
-    const today = new Date();
-    const startOfDay = new Date(today.setHours(0, 0, 0, 0));
-    const endOfDay = new Date(today.setHours(23, 59, 59, 999));
-
-    const [newPatients, totalAppointments, completedAppointments] = await Promise.all([
-      this.prisma.patient.count({
-        where: { createdAt: { gte: startOfDay, lte: endOfDay } }
+    const [
+      totalPatients,
+      patientsByStatus,
+      patientsByMonth,
+      averageAge,
+    ] = await Promise.all([
+      this.prisma.patient.count({ where: { isDeleted: false } }),
+      this.prisma.patient.groupBy({
+        by: ['status'],
+        where: { isDeleted: false },
+        _count: { status: true },
       }),
-      this.prisma.appointment.count({
-        where: { scheduledAt: { gte: startOfDay, lte: endOfDay } }
+      this.prisma.patient.findMany({
+        where: {
+          createdAt: { gte: new Date(Date.now() - 365 * 24 * 60 * 60 * 1000) },
+          isDeleted: false,
+        },
+        select: { createdAt: true },
       }),
-      this.prisma.appointment.count({
-        where: { 
-          scheduledAt: { gte: startOfDay, lte: endOfDay },
-          status: 'COMPLETED'
-        }
-      })
+      this.prisma.profile.aggregate({
+        where: {
+          dateOfBirth: { not: null },
+          user: { patient: { isNot: null } },
+        },
+        _avg: {
+          dateOfBirth: true,
+        },
+      }),
     ]);
 
-    return { newPatients, totalAppointments, completedAppointments };
-  }
-
-  async getPendingAssignments() {
-    const [unassignedPatients, pendingAppointments] = await Promise.all([
-      this.prisma.patient.count({ where: { status: 'unassigned' } }),
-      this.prisma.appointment.count({ where: { status: 'SCHEDULED' } })
-    ]);
-
-    return { unassignedPatients, pendingAppointments };
-  }
-
-  async getDoctorPerformance() {
-    const doctors = await this.prisma.doctor.findMany({
-      include: {
-        appointments: { where: { status: { in: ['COMPLETED', 'CANCELLED', 'NO_SHOW'] } } },
-        assignedPatients: { where: { isActive: true } },
-        _count: { select: { prescriptions: true } }
-      }
-    });
-
-    return doctors.map(doctor => ({
-      doctorId: doctor.id,
-      name: `Dr. ${doctor.userId}`,
-      totalAppointments: doctor.appointments.length,
-      completedAppointments: doctor.appointments.filter(a => a.status === 'COMPLETED').length,
-      completionRate: doctor.appointments.length > 0 
-        ? (doctor.appointments.filter(a => a.status === 'COMPLETED').length / doctor.appointments.length) * 100 
-        : 0,
-      assignedPatients: doctor.assignedPatients.length,
-      prescriptionsWritten: doctor._count.prescriptions
-    }));
-  }
-
-  async getCompletionTrends() {
-    const last30Days = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    
-    const appointments = await this.prisma.appointment.findMany({
-      where: { scheduledAt: { gte: last30Days } },
-      select: { scheduledAt: true, status: true }
-    });
-
-    const trends = appointments.reduce((acc: any, appointment) => {
-      const date = appointment.scheduledAt.toISOString().split('T')[0];
-      if (!acc[date]) acc[date] = { total: 0, completed: 0 };
-      acc[date].total++;
-      if (appointment.status === 'COMPLETED') acc[date].completed++;
+    const monthlyRegistrations = patientsByMonth.reduce((acc, patient) => {
+      const month = patient.createdAt.toISOString().substring(0, 7);
+      acc[month] = (acc[month] || 0) + 1;
       return acc;
-    }, {});
+    }, {} as Record<string, number>);
 
-    return Object.entries(trends).map(([date, data]: [string, any]) => ({
-      date,
-      total: data.total,
-      completed: data.completed,
-      completionRate: (data.completed / data.total) * 100
-    }));
+    return {
+      totalPatients,
+      patientsByStatus: patientsByStatus.reduce((acc, item) => {
+        acc[item.status] = item._count.status;
+        return acc;
+      }, {} as Record<string, number>),
+      monthlyRegistrations,
+      averageAge: averageAge._avg.dateOfBirth 
+        ? Math.floor((Date.now() - averageAge._avg.dateOfBirth.getTime()) / (365.25 * 24 * 60 * 60 * 1000))
+        : null,
+    };
   }
 
-  async getAlerts() {
-    const [overdueAppointments, criticalVitals, unassignedPatients] = await Promise.all([
-      this.prisma.appointment.count({
+  async getRevenueAnalytics(startDate?: Date, endDate?: Date) {
+    const start = startDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const end = endDate || new Date();
+
+    const completedAppointments = await this.prisma.appointment.findMany({
+      where: {
+        status: 'COMPLETED',
+        completedAt: { gte: start, lte: end },
+        isDeleted: false,
+      },
+      include: {
+        doctor: { select: { consultationFee: true } },
+      },
+    });
+
+    const totalRevenue = completedAppointments.reduce(
+      (sum, apt) => sum + apt.doctor.consultationFee,
+      0
+    );
+
+    const dailyRevenue = completedAppointments.reduce((acc, apt) => {
+      const date = apt.completedAt.toISOString().split('T')[0];
+      acc[date] = (acc[date] || 0) + apt.doctor.consultationFee;
+      return acc;
+    }, {} as Record<string, number>);
+
+    return {
+      totalRevenue,
+      dailyRevenue,
+      totalAppointments: completedAppointments.length,
+      averageRevenuePerAppointment: completedAppointments.length > 0 
+        ? totalRevenue / completedAppointments.length 
+        : 0,
+    };
+  }
+
+  async getSystemHealth() {
+    const [
+      activeUsers,
+      recentLogins,
+      systemErrors,
+      databaseSize,
+    ] = await Promise.all([
+      this.prisma.user.count({
         where: {
-          scheduledAt: { lt: new Date() },
-          status: { in: ['SCHEDULED', 'CONFIRMED'] }
-        }
+          lastLoginAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+          isActive: true,
+        },
       }),
-      this.prisma.vital.count({
+      this.prisma.user.count({
         where: {
-          recordedAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
-          OR: [
-            { type: 'BLOOD_PRESSURE', value: { contains: '180' } },
-            { type: 'HEART_RATE', value: { gt: '100' } },
-            { type: 'OXYGEN_SATURATION', value: { lt: '90' } }
-          ]
-        }
+          lastLoginAt: { gte: new Date(Date.now() - 60 * 60 * 1000) },
+        },
       }),
-      this.prisma.patient.count({ where: { status: 'unassigned' } })
+      this.prisma.auditLog.count({
+        where: {
+          action: { contains: 'ERROR' },
+          createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+        },
+      }),
+      this.prisma.user.count(), // Simplified database size metric
     ]);
 
-    const alerts = [];
-    if (overdueAppointments > 0) alerts.push({ type: 'overdue_appointments', count: overdueAppointments, severity: 'high' });
-    if (criticalVitals > 0) alerts.push({ type: 'critical_vitals', count: criticalVitals, severity: 'critical' });
-    if (unassignedPatients > 0) alerts.push({ type: 'unassigned_patients', count: unassignedPatients, severity: 'medium' });
-
-    return { alerts, totalAlerts: alerts.length };
+    return {
+      activeUsers,
+      recentLogins,
+      systemErrors,
+      databaseSize,
+      uptime: process.uptime(),
+      memoryUsage: process.memoryUsage(),
+    };
   }
 }
