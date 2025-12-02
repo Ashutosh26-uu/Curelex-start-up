@@ -6,8 +6,8 @@ import { QueryProvider } from './providers/QueryProvider';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'Healthcare Telemedicine Platform',
-  description: 'Complete healthcare management system',
+  title: 'Curelex Health Tech - Digital Healthcare Platform',
+  description: 'Modern, connected, and reliable digital healthcare ecosystem by Curelex Health Tech Pvt. Ltd.',
 };
 
 export default function RootLayout({
