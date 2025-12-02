@@ -52,6 +52,18 @@ export class VitalsController {
     return this.vitalsService.update(id, updateVitalsDto, req.user.id);
   }
 
+  @ApiOperation({ summary: 'Get patient vital history' })
+  @Get('patient/:patientId/history')
+  @Roles(UserRole.PATIENT, UserRole.DOCTOR, UserRole.JUNIOR_DOCTOR, UserRole.NURSE, UserRole.ADMIN)
+  getPatientVitalHistory(
+    @Param('patientId') patientId: string,
+    @Query('type') type?: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+  ) {
+    return this.vitalsService.findPatientVitals(patientId, type, page, limit);
+  }
+
   @ApiOperation({ summary: 'Delete vital record' })
   @Delete(':id')
   @Roles(UserRole.DOCTOR, UserRole.JUNIOR_DOCTOR, UserRole.NURSE, UserRole.ADMIN)

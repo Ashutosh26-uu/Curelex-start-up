@@ -74,4 +74,25 @@ export class AppointmentController {
       followUpDate ? new Date(followUpDate) : undefined,
     );
   }
+
+  @ApiOperation({ summary: 'Get my appointments' })
+  @Get('me/all')
+  @Roles(UserRole.PATIENT, UserRole.DOCTOR)
+  getMyAppointments(
+    @Request() req: any,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+  ) {
+    return this.appointmentService.findAll(req.user.id, req.user.role, page, limit);
+  }
+
+  @ApiOperation({ summary: 'Reschedule appointment' })
+  @Patch(':id/reschedule')
+  @Roles(UserRole.PATIENT, UserRole.DOCTOR, UserRole.ADMIN)
+  reschedule(
+    @Param('id') id: string,
+    @Body('scheduledAt') scheduledAt: string,
+  ) {
+    return this.appointmentService.update(id, { scheduledAt });
+  }
 }
