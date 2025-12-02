@@ -1,7 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
-import { NotificationService } from '../notification/notification.service';
 import { AssignDoctorDto } from './dto/assign-doctor.dto';
+import { NotificationService } from '../notification/notification.service';
 
 @Injectable()
 export class AdminService {
@@ -10,109 +10,170 @@ export class AdminService {
     private notificationService: NotificationService,
   ) {}
 
-  async assignDoctorToPatient(assignDoctorDto: AssignDoctorDto) {
+  async assignDoctorToPatient(assignDoctorDto: AssignDoctorDto, adminUserId: string) {
     const { doctorId, patientId } = assignDoctorDto;
 
-    // Perform assignment and update patient status in transaction
-    const result = await this.prisma.$transaction(async (tx) => {
-      // Create doctor-patient assignment
-      const assignment = await tx.doctorPatientAssignment.create({
-        data: {
-          doctorId,
-          patientId,
-        },
-        include: {
-          doctor: { include: { user: { include: { profile: true } } } },
-          patient: { include: { user: { include: { profile: true } } } },
-        },
-      });
-
-      // Update patient status to "assigned"
-      await tx.patient.update({
+    // Verify doctor and patient exist
+    const [doctor, patient] = await Promise.all([
+      this.prisma.doctor.findUnique({
+        where: { id: doctorId },
+        include: { user: { include: { profile: true } } },
+      }),
+      this.prisma.patient.findUnique({
         where: { id: patientId },
-        data: { status: 'assigned' },
-      });
+        include: { user: { include: { profile: true } } },
+      }),
+    ]);
 
-      return assignment;
+    if (!doctor) {
+      throw new NotFoundException('Doctor not found');
+    }
+
+    if (!patient) {
+      throw new NotFoundException('Patient not found');
+    }
+
+    // Check if assignment already exists
+    const existingAssignment = await this.prisma.doctorPatientAssignment.findUnique({
+      where: { doctorId_patientId: { doctorId, patientId } },
     });
 
-    // Notify doctor via email and push notification
-    await this.notifyDoctorAssignment(result);
+    if (existingAssignment && existingAssignment.isActive) {
+      throw new BadRequestException('Doctor is already assigned to this patient');
+    }
 
-    return result;
-  }
-
-  private async notifyDoctorAssignment(assignment: any) {
-    const doctor = assignment.doctor;
-    const patient = assignment.patient;
-    const patientName = `${patient.user.profile.firstName} ${patient.user.profile.lastName}`;
-
-    // Create email notification
-    await this.notificationService.create({
-      userId: doctor.userId,
-      type: 'EMAIL',
-      title: 'New Patient Assignment',
-      message: `You have been assigned a new patient: ${patientName}. Please review their medical history and schedule an appointment.`,
-      metadata: {
-        patientId: patient.id,
-        assignmentId: assignment.id,
-        type: 'doctor-assignment',
+    // Create or reactivate assignment
+    const assignment = await this.prisma.doctorPatientAssignment.upsert({
+      where: { doctorId_patientId: { doctorId, patientId } },
+      update: {
+        isActive: true,
+        assignedBy: adminUserId,
+        assignedAt: new Date(),
+        unassignedAt: null,
       },
-    });
-
-    // Create push notification
-    await this.notificationService.create({
-      userId: doctor.userId,
-      type: 'PUSH',
-      title: 'New Patient Assignment',
-      message: `New patient ${patientName} has been assigned to you.`,
-      metadata: {
-        patientId: patient.id,
-        assignmentId: assignment.id,
-        type: 'doctor-assignment',
+      create: {
+        doctorId,
+        patientId,
+        assignedBy: adminUserId,
       },
-    });
-  }
-
-  async unassignDoctorFromPatient(doctorId: string, patientId: string) {
-    return this.prisma.doctorPatientAssignment.updateMany({
-      where: { doctorId, patientId },
-      data: { isActive: false },
-    });
-  }
-
-  async getAllUsers() {
-    return this.prisma.user.findMany({
-      include: {
-        profile: true,
-        patient: true,
-        doctor: true,
-        officer: true,
-      },
-      orderBy: { createdAt: 'desc' },
-    });
-  }
-
-  async deactivateUser(userId: string) {
-    return this.prisma.user.update({
-      where: { id: userId },
-      data: { isActive: false },
-    });
-  }
-
-  async activateUser(userId: string) {
-    return this.prisma.user.update({
-      where: { id: userId },
-      data: { isActive: true },
-    });
-  }
-
-  async getDoctorAssignments() {
-    return this.prisma.doctorPatientAssignment.findMany({
-      where: { isActive: true },
       include: {
         doctor: { include: { user: { include: { profile: true } } } },
         patient: { include: { user: { include: { profile: true } } } },
+      },
+    });
+
+    // Update patient status
+    await this.prisma.patient.update({
+      where: { id: patientId },
+      data: { status: 'ACTIVE' },
+    });
+
+    // Send notifications
+    await Promise.all([
+      this.notificationService.createNotification({
+        userId: doctor.userId,
+        type: 'SYSTEM',
+        title: 'New Patient Assignment',
+        message: `You have been assigned to patient ${patient.user.profile.firstName} ${patient.user.profile.lastName}`,
+      }),
+      this.notificationService.createNotification({
+        userId: patient.userId,
+        type: 'SYSTEM',
+        title: 'Doctor Assignment',
+        message: `Dr. ${doctor.user.profile.firstName} ${doctor.user.profile.lastName} has been assigned as your doctor`,
+      }),
+    ]);
+
+    return assignment;
+  }
+
+  async unassignDoctorFromPatient(doctorId: string, patientId: string) {
+    const assignment = await this.prisma.doctorPatientAssignment.findUnique({
+      where: { doctorId_patientId: { doctorId, patientId } },
+    });
+
+    if (!assignment || !assignment.isActive) {
+      throw new NotFoundException('Assignment not found');
+    }
+
+    return this.prisma.doctorPatientAssignment.update({
+      where: { doctorId_patientId: { doctorId, patientId } },
+      data: {
+        isActive: false,
+        unassignedAt: new Date(),
+      },
+    });
+  }
+
+  async getAllUsers(page = 1, limit = 20, role?: string, search?: string) {
+    const skip = (page - 1) * limit;
+    let whereClause: any = { isDeleted: false };
+
+    if (role) {
+      whereClause.role = role;
+    }
+
+    if (search) {
+      whereClause.OR = [
+        { email: { contains: search } },
+        { profile: { firstName: { contains: search } } },
+        { profile: { lastName: { contains: search } } },
+      ];
+    }
+
+    const [users, total] = await Promise.all([
+      this.prisma.user.findMany({
+        where: whereClause,
+        include: {
+          profile: true,
+          patient: true,
+          doctor: true,
+          officer: true,
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.user.count({ where: whereClause }),
+    ]);
+
+    return {
+      users,
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  async toggleUserStatus(userId: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: { isActive: !user.isActive },
+    });
+  }
+
+  async deleteUser(userId: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        isDeleted: true,
+        deletedAt: new Date(),
+        isActive: false,
       },
     });
   }
@@ -124,14 +185,18 @@ export class AdminService {
       totalPatients,
       totalDoctors,
       totalAppointments,
-      pendingAppointments,
+      completedAppointments,
+      totalPrescriptions,
+      activePrescriptions,
     ] = await Promise.all([
-      this.prisma.user.count(),
-      this.prisma.user.count({ where: { isActive: true } }),
-      this.prisma.patient.count(),
-      this.prisma.doctor.count(),
-      this.prisma.appointment.count(),
-      this.prisma.appointment.count({ where: { status: 'SCHEDULED' } }),
+      this.prisma.user.count({ where: { isDeleted: false } }),
+      this.prisma.user.count({ where: { isActive: true, isDeleted: false } }),
+      this.prisma.patient.count({ where: { isDeleted: false } }),
+      this.prisma.doctor.count({ where: { isDeleted: false } }),
+      this.prisma.appointment.count({ where: { isDeleted: false } }),
+      this.prisma.appointment.count({ where: { status: 'COMPLETED', isDeleted: false } }),
+      this.prisma.prescription.count({ where: { isDeleted: false } }),
+      this.prisma.prescription.count({ where: { status: 'ACTIVE', isDeleted: false } }),
     ]);
 
     return {
@@ -140,7 +205,58 @@ export class AdminService {
       totalPatients,
       totalDoctors,
       totalAppointments,
-      pendingAppointments,
+      completedAppointments,
+      totalPrescriptions,
+      activePrescriptions,
+      usersByRole: await this.getUsersByRole(),
+    };
+  }
+
+  private async getUsersByRole() {
+    const users = await this.prisma.user.groupBy({
+      by: ['role'],
+      where: { isDeleted: false },
+      _count: { role: true },
+    });
+
+    return users.reduce((acc, user) => {
+      acc[user.role] = user._count.role;
+      return acc;
+    }, {} as Record<string, number>);
+  }
+
+  async getRecentActivity(limit = 50) {
+    return this.prisma.auditLog.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+    });
+  }
+
+  async getDoctorPatientAssignments(page = 1, limit = 20) {
+    const skip = (page - 1) * limit;
+
+    const [assignments, total] = await Promise.all([
+      this.prisma.doctorPatientAssignment.findMany({
+        where: { isActive: true },
+        include: {
+          doctor: { include: { user: { include: { profile: true } } } },
+          patient: { include: { user: { include: { profile: true } } } },
+        },
+        orderBy: { assignedAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.doctorPatientAssignment.count({ where: { isActive: true } }),
+    ]);
+
+    return {
+      assignments,
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit),
+      },
     };
   }
 }

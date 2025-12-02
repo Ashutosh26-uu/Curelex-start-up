@@ -1,33 +1,19 @@
-import { IsString, IsOptional, IsNumber } from 'class-validator';
+import { IsString, IsOptional } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class UpdateVitalsDto {
-  @ApiProperty()
+  @ApiProperty({ required: false })
+  @IsOptional()
   @IsString()
-  patientId: string;
+  value?: string;
 
-  @ApiProperty()
+  @ApiProperty({ required: false })
+  @IsOptional()
   @IsString()
-  BP: string;
-
-  @ApiProperty()
-  @IsNumber()
-  heartRate: number;
-
-  @ApiProperty()
-  @IsNumber()
-  oxygenLevel: number;
-
-  @ApiProperty()
-  @IsNumber()
-  sugarLevel: number;
+  unit?: string;
 
   @ApiProperty({ required: false })
   @IsOptional()
   @IsString()
   notes?: string;
-
-  @ApiProperty()
-  @IsString()
-  updatedBy: string;
 }

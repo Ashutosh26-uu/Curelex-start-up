@@ -4,9 +4,9 @@ import { ApiProperty } from '@nestjs/swagger';
 export class AssignDoctorDto {
   @ApiProperty()
   @IsString()
-  patientId: string;
+  doctorId: string;
 
   @ApiProperty()
   @IsString()
-  doctorId: string;
+  patientId: string;
 }

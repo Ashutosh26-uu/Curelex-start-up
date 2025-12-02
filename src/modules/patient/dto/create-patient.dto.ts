@@ -1,5 +1,11 @@
-import { IsString, IsOptional } from 'class-validator';
+import { IsString, IsOptional, IsEnum } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
+
+export enum PatientStatus {
+  UNASSIGNED = 'UNASSIGNED',
+  ACTIVE = 'ACTIVE',
+  INACTIVE = 'INACTIVE',
+}
 
 export class CreatePatientDto {
   @ApiProperty()
@@ -10,6 +16,11 @@ export class CreatePatientDto {
   @IsOptional()
   @IsString()
   emergencyContact?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  emergencyPhone?: string;
 
   @ApiProperty({ required: false })
   @IsOptional()
@@ -25,4 +36,19 @@ export class CreatePatientDto {
   @IsOptional()
   @IsString()
   chronicConditions?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  insuranceNumber?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  insuranceProvider?: string;
+
+  @ApiProperty({ enum: PatientStatus, default: PatientStatus.UNASSIGNED })
+  @IsOptional()
+  @IsEnum(PatientStatus)
+  status?: PatientStatus;
 }
