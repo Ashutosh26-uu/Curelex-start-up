@@ -13,7 +13,11 @@ timeout /t 15 /nobreak > nul
 
 echo.
 echo Setting up database...
+echo Generating Prisma client...
+npm run prisma:generate
+echo Running migrations...
 npm run prisma:migrate
+echo Seeding database...
 npm run prisma:seed
 
 echo.
@@ -27,8 +31,12 @@ echo API Documentation: http://localhost:3000/api/docs
 echo Database Admin: http://localhost:8080
 echo.
 
-start "Backend Server" cmd /k "npm run start:dev"
-start "Frontend Server" cmd /k "cd frontend && npm install && npm run dev"
+echo Starting backend server...
+start "Backend Server" cmd /k "echo Starting NestJS Backend... && npm run start:dev"
+echo Waiting for backend to start...
+timeout /t 5 /nobreak > nul
+echo Starting frontend server...
+start "Frontend Server" cmd /k "echo Starting Next.js Frontend... && cd frontend && npm install && npm run dev"
 
 echo.
 echo ========================================

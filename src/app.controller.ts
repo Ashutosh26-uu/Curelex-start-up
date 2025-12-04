@@ -7,7 +7,7 @@ import { Public } from './common/decorators/public.decorator';
 export class AppController {
   @ApiOperation({ summary: 'API health check' })
   @Public()
-  @Get()
+  @Get('health')
   getHealth() {
     return {
       status: 'ok',
@@ -16,9 +16,21 @@ export class AppController {
     };
   }
 
+  @ApiOperation({ summary: 'API root' })
+  @Public()
+  @Get()
+  getRoot() {
+    return {
+      message: 'Healthcare Telemedicine Platform API',
+      version: '1.0.0',
+      docs: '/api/docs',
+      health: '/api/v1/health',
+    };
+  }
+
   @ApiOperation({ summary: 'Detailed health check' })
   @Public()
-  @Get('health')
+  @Get('healthcheck')
   getHealthCheck() {
     return {
       status: 'healthy',

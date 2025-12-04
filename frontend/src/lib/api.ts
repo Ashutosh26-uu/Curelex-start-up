@@ -128,6 +128,12 @@ export const authApi = {
     }
     return response;
   },
+  changePassword: (data: { currentPassword: string; newPassword: string }) => 
+    api.post('/auth/change-password', data),
+  forgotPassword: (email: string) => 
+    api.post('/auth/forgot-password', { email }),
+  resetPassword: (data: { token: string; newPassword: string }) => 
+    api.post('/auth/reset-password', data),
 };
 
 export const patientApi = {

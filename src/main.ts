@@ -13,16 +13,12 @@ async function bootstrap() {
   }));
 
   app.enableCors({
-    origin: process.env.NODE_ENV === 'production' 
-      ? ['https://yourdomain.com'] 
-      : ['http://localhost:3000', 'http://localhost:3001'],
+    origin: true,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
   });
-  app.setGlobalPrefix('api/v1', {
-    exclude: ['/health', '/status', '/']
-  });
+  app.setGlobalPrefix('api/v1');
 
   const config = new DocumentBuilder()
     .setTitle('Healthcare Telemedicine API')
