@@ -6,6 +6,7 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
+import { Public } from '../../common/decorators/public.decorator';
 
 @ApiTags('Patients')
 @Controller('patients')
@@ -13,6 +14,7 @@ export class PatientController {
   constructor(private patientService: PatientService) {}
 
   @ApiOperation({ summary: 'Register new patient' })
+  @Public()
   @Post('register')
   register(@Body() patientData: any) {
     return this.patientService.registerPatient(patientData);

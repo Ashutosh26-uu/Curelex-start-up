@@ -17,8 +17,12 @@ async function bootstrap() {
       ? ['https://yourdomain.com'] 
       : ['http://localhost:3000', 'http://localhost:3001'],
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
   });
-  app.setGlobalPrefix('api/v1');
+  app.setGlobalPrefix('api/v1', {
+    exclude: ['/health', '/status', '/']
+  });
 
   const config = new DocumentBuilder()
     .setTitle('Healthcare Telemedicine API')
@@ -32,7 +36,17 @@ async function bootstrap() {
 
   const port = process.env.PORT || 3000;
   await app.listen(port, '0.0.0.0');
-  console.log(`Application is running on: http://localhost:${port}`);
-  console.log(`API Documentation: http://localhost:${port}/api/docs`);
+  
+  console.log('\n🚀 Healthcare Telemedicine Platform Started!');
+  console.log('==========================================');
+  console.log(`📡 Backend API: http://localhost:${port}`);
+  console.log(`📚 API Documentation: http://localhost:${port}/api/docs`);
+  console.log(`🏥 Health Check: http://localhost:${port}/health`);
+  console.log('==========================================');
+  console.log('\n📋 Login Credentials:');
+  console.log('👨💼 Admin: ashutosh@curelex.com / admin@123');
+  console.log('👨⚕️ Doctor: doctor@healthcare.com / doctor123');
+  console.log('👤 Patient: patient@healthcare.com / patient123');
+  console.log('==========================================\n');
 }
 bootstrap();

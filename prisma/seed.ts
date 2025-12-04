@@ -4,37 +4,48 @@ import * as bcrypt from 'bcryptjs';
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log('Seeding database...');
+  console.log('🌱 Starting database seed...');
+
+  // Hash password
+  const hashedPassword = await bcrypt.hash('admin@123', 12);
+  const doctorPassword = await bcrypt.hash('doctor123', 12);
+  const patientPassword = await bcrypt.hash('patient123', 12);
 
   // Create Admin User
-  const adminPassword = await bcrypt.hash('admin123', 12);
-  const admin = await prisma.user.create({
-    data: {
-      email: 'admin@healthcare.com',
-      password: adminPassword,
+  const adminUser = await prisma.user.upsert({
+    where: { email: 'ashutosh@curelex.com' },
+    update: {},
+    create: {
+      email: 'ashutosh@curelex.com',
+      password: hashedPassword,
       role: 'ADMIN',
+      isActive: true,
       profile: {
         create: {
-          firstName: 'System',
-          lastName: 'Administrator',
-          phone: '+1234567890',
+          firstName: 'Ashutosh',
+          lastName: 'Mishra',
+          phone: '+91-9876543210',
+          gender: 'Male',
         },
       },
     },
   });
 
-  // Create CEO
-  const ceoPassword = await bcrypt.hash('ceo123', 12);
-  const ceo = await prisma.user.create({
-    data: {
+  // Create CEO User
+  const ceoUser = await prisma.user.upsert({
+    where: { email: 'ceo@healthcare.com' },
+    update: {},
+    create: {
       email: 'ceo@healthcare.com',
-      password: ceoPassword,
+      password: hashedPassword,
       role: 'CEO',
+      isActive: true,
       profile: {
         create: {
           firstName: 'John',
           lastName: 'Smith',
-          phone: '+1234567891',
+          phone: '+91-9876543211',
+          gender: 'Male',
         },
       },
       officer: {
@@ -47,197 +58,319 @@ async function main() {
     },
   });
 
-  // Create Sample Doctor
-  const doctorPassword = await bcrypt.hash('doctor123', 12);
-  const doctor = await prisma.user.create({
-    data: {
+  // Create Doctor User
+  const doctorUser = await prisma.user.upsert({
+    where: { email: 'doctor@healthcare.com' },
+    update: {},
+    create: {
       email: 'doctor@healthcare.com',
       password: doctorPassword,
       role: 'DOCTOR',
+      isActive: true,
       profile: {
         create: {
           firstName: 'Dr. Sarah',
           lastName: 'Johnson',
-          phone: '+1234567892',
+          phone: '+91-9876543212',
+          gender: 'Female',
         },
       },
       doctor: {
         create: {
           doctorId: 'DOC-001',
-          specialization: 'Cardiology',
-          licenseNumber: 'LIC-12345',
+          specialization: 'General Medicine',
+          licenseNumber: 'MED-12345',
           experience: 10,
-          consultationFee: 150,
-          qualification: 'MD, Cardiology',
-          hospital: 'Healthcare Center',
+          consultationFee: 500,
+          isAvailable: true,
         },
       },
     },
   });
 
-  // Create Sample Patient
-  const patientPassword = await bcrypt.hash('patient123', 12);
-  const patient = await prisma.user.create({
-    data: {
+  // Create Junior Doctor User
+  const juniorDoctorUser = await prisma.user.upsert({
+    where: { email: 'junior.doctor@healthcare.com' },
+    update: {},
+    create: {
+      email: 'junior.doctor@healthcare.com',
+      password: doctorPassword,
+      role: 'JUNIOR_DOCTOR',
+      isActive: true,
+      profile: {
+        create: {
+          firstName: 'Dr. Mike',
+          lastName: 'Wilson',
+          phone: '+91-9876543213',
+          gender: 'Male',
+        },
+      },
+      doctor: {
+        create: {
+          doctorId: 'DOC-002',
+          specialization: 'Internal Medicine',
+          licenseNumber: 'MED-12346',
+          experience: 3,
+          consultationFee: 300,
+          isAvailable: true,
+        },
+      },
+    },
+  });
+
+  // Create Nurse User
+  const nurseUser = await prisma.user.upsert({
+    where: { email: 'nurse@healthcare.com' },
+    update: {},
+    create: {
+      email: 'nurse@healthcare.com',
+      password: hashedPassword,
+      role: 'NURSE',
+      isActive: true,
+      profile: {
+        create: {
+          firstName: 'Mary',
+          lastName: 'Brown',
+          phone: '+91-9876543214',
+          gender: 'Female',
+        },
+      },
+    },
+  });
+
+  // Create Patient User
+  const patientUser = await prisma.user.upsert({
+    where: { email: 'patient@healthcare.com' },
+    update: {},
+    create: {
       email: 'patient@healthcare.com',
       password: patientPassword,
       role: 'PATIENT',
+      isActive: true,
       profile: {
         create: {
           firstName: 'Alice',
-          lastName: 'Williams',
-          phone: '+1234567893',
-          dateOfBirth: new Date('1990-05-15'),
+          lastName: 'Davis',
+          phone: '+91-9876543215',
           gender: 'Female',
-          address: '123 Main St',
-          city: 'New York',
-          state: 'NY',
-          zipCode: '10001',
         },
       },
       patient: {
         create: {
           patientId: 'PAT-001',
-          emergencyContact: 'Bob Williams',
-          emergencyPhone: '+1234567894',
+          emergencyContact: 'Bob Davis',
+          emergencyPhone: '+91-9876543216',
           bloodGroup: 'O+',
           allergies: 'None',
-          chronicConditions: 'None',
-          insuranceNumber: 'INS-12345',
-          insuranceProvider: 'HealthCare Plus',
+          status: 'ACTIVE',
         },
       },
     },
   });
 
-  // Create Sample Nurse
-  const nursePassword = await bcrypt.hash('nurse123', 12);
-  const nurse = await prisma.user.create({
-    data: {
-      email: 'nurse@healthcare.com',
-      password: nursePassword,
-      role: 'NURSE',
+  // Create another Patient
+  const patient2User = await prisma.user.upsert({
+    where: { email: 'patient2@healthcare.com' },
+    update: {},
+    create: {
+      email: 'patient2@healthcare.com',
+      password: patientPassword,
+      role: 'PATIENT',
+      isActive: true,
       profile: {
         create: {
-          firstName: 'Mary',
-          lastName: 'Davis',
-          phone: '+1234567895',
+          firstName: 'Robert',
+          lastName: 'Miller',
+          phone: '+91-9876543217',
+          gender: 'Male',
+        },
+      },
+      patient: {
+        create: {
+          patientId: 'PAT-002',
+          emergencyContact: 'Jane Miller',
+          emergencyPhone: '+91-9876543218',
+          bloodGroup: 'A+',
+          allergies: 'Penicillin',
+          status: 'ACTIVE',
         },
       },
     },
   });
 
-  // Assign Doctor to Patient
-  const doctorRecord = await prisma.doctor.findUnique({ where: { userId: doctor.id } });
-  const patientRecord = await prisma.patient.findUnique({ where: { userId: patient.id } });
-  
-  await prisma.doctorPatientAssignment.create({
-    data: {
-      doctorId: doctorRecord.id,
-      patientId: patientRecord.id,
-      assignedBy: admin.id,
-    },
+  // Assign Doctor to Patients
+  await prisma.doctorPatientAssignment.createMany({
+    data: [
+      {
+        doctorId: doctorUser.doctor!.id,
+        patientId: patientUser.patient!.id,
+        assignedBy: adminUser.id,
+      },
+      {
+        doctorId: doctorUser.doctor!.id,
+        patientId: patient2User.patient!.id,
+        assignedBy: adminUser.id,
+      },
+    ],
+    skipDuplicates: true,
   });
 
-  // Create Sample Appointment
-  const appointmentDate = new Date();
-  appointmentDate.setDate(appointmentDate.getDate() + 1);
-  appointmentDate.setHours(10, 0, 0, 0);
+  // Create Sample Appointments
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  tomorrow.setHours(10, 0, 0, 0);
 
-  await prisma.appointment.create({
-    data: {
-      patientId: patientRecord.id,
-      doctorId: doctorRecord.id,
-      scheduledAt: appointmentDate,
-      duration: 30,
-      status: 'SCHEDULED',
-      meetLink: 'https://meet.google.com/sample-link',
-      notes: 'Regular checkup',
-    },
+  const nextWeek = new Date();
+  nextWeek.setDate(nextWeek.getDate() + 7);
+  nextWeek.setHours(14, 0, 0, 0);
+
+  await prisma.appointment.createMany({
+    data: [
+      {
+        patientId: patientUser.patient!.id,
+        doctorId: doctorUser.doctor!.id,
+        scheduledAt: tomorrow,
+        duration: 30,
+        status: 'SCHEDULED',
+        notes: 'Regular checkup',
+        meetLink: 'https://meet.google.com/abc-defg-hij',
+      },
+      {
+        patientId: patient2User.patient!.id,
+        doctorId: doctorUser.doctor!.id,
+        scheduledAt: nextWeek,
+        duration: 45,
+        status: 'SCHEDULED',
+        notes: 'Follow-up consultation',
+        meetLink: 'https://meet.google.com/xyz-uvwx-yzab',
+      },
+    ],
+    skipDuplicates: true,
   });
 
   // Create Sample Vitals
-  await prisma.vital.create({
-    data: {
-      patientId: patientRecord.id,
-      doctorId: doctorRecord.id,
-      type: 'BLOOD_PRESSURE',
-      value: '120/80',
-      unit: 'mmHg',
-      recordedBy: doctor.id,
-      notes: 'Normal blood pressure',
-    },
-  });
-
-  await prisma.vital.create({
-    data: {
-      patientId: patientRecord.id,
-      doctorId: doctorRecord.id,
-      type: 'HEART_RATE',
-      value: '72',
-      unit: 'bpm',
-      recordedBy: doctor.id,
-      notes: 'Normal heart rate',
-    },
-  });
-
-  // Create Sample Prescription
-  await prisma.prescription.create({
-    data: {
-      patientId: patientRecord.id,
-      doctorId: doctorRecord.id,
-      medication: 'Lisinopril',
-      dosage: '10mg',
-      frequency: 'Once daily',
-      duration: '30 days',
-      instructions: 'Take with food',
-      status: 'ACTIVE',
-    },
+  await prisma.vital.createMany({
+    data: [
+      {
+        patientId: patientUser.patient!.id,
+        doctorId: doctorUser.doctor!.id,
+        type: 'BLOOD_PRESSURE',
+        value: '120/80',
+        unit: 'mmHg',
+        recordedBy: nurseUser.id,
+        notes: 'Normal blood pressure',
+      },
+      {
+        patientId: patientUser.patient!.id,
+        doctorId: doctorUser.doctor!.id,
+        type: 'HEART_RATE',
+        value: '72',
+        unit: 'bpm',
+        recordedBy: nurseUser.id,
+        notes: 'Normal heart rate',
+      },
+      {
+        patientId: patient2User.patient!.id,
+        doctorId: doctorUser.doctor!.id,
+        type: 'BLOOD_PRESSURE',
+        value: '130/85',
+        unit: 'mmHg',
+        recordedBy: nurseUser.id,
+        notes: 'Slightly elevated',
+      },
+    ],
+    skipDuplicates: true,
   });
 
   // Create Sample Medical History
-  await prisma.medicalHistory.create({
-    data: {
-      patientId: patientRecord.id,
-      condition: 'Hypertension',
-      diagnosis: 'Essential hypertension',
-      treatment: 'Lifestyle changes and medication',
-      severity: 'Mild',
-      diagnosedAt: new Date('2023-01-15'),
-    },
+  await prisma.medicalHistory.createMany({
+    data: [
+      {
+        patientId: patientUser.patient!.id,
+        condition: 'Hypertension',
+        diagnosis: 'Essential hypertension',
+        treatment: 'Lifestyle modifications and medication',
+        severity: 'Mild',
+        diagnosedAt: new Date('2023-01-15'),
+      },
+      {
+        patientId: patient2User.patient!.id,
+        condition: 'Diabetes Type 2',
+        diagnosis: 'Type 2 Diabetes Mellitus',
+        treatment: 'Metformin and diet control',
+        severity: 'Moderate',
+        diagnosedAt: new Date('2022-06-10'),
+      },
+    ],
+    skipDuplicates: true,
+  });
+
+  // Create Sample Prescriptions
+  await prisma.prescription.createMany({
+    data: [
+      {
+        patientId: patientUser.patient!.id,
+        doctorId: doctorUser.doctor!.id,
+        medication: 'Lisinopril',
+        dosage: '10mg',
+        frequency: 'Once daily',
+        duration: '30 days',
+        instructions: 'Take with food',
+        status: 'ACTIVE',
+      },
+      {
+        patientId: patient2User.patient!.id,
+        doctorId: doctorUser.doctor!.id,
+        medication: 'Metformin',
+        dosage: '500mg',
+        frequency: 'Twice daily',
+        duration: '90 days',
+        instructions: 'Take with meals',
+        status: 'ACTIVE',
+      },
+    ],
+    skipDuplicates: true,
   });
 
   // Create Sample Notifications
-  await prisma.notification.create({
-    data: {
-      userId: patient.id,
-      type: 'WELCOME',
-      title: 'Welcome to Healthcare Platform',
-      message: 'Welcome Alice! Your account has been created successfully.',
-    },
+  await prisma.notification.createMany({
+    data: [
+      {
+        userId: patientUser.id,
+        type: 'APPOINTMENT',
+        title: 'Upcoming Appointment',
+        message: 'You have an appointment tomorrow at 10:00 AM',
+      },
+      {
+        userId: doctorUser.id,
+        type: 'APPOINTMENT',
+        title: 'New Appointment',
+        message: 'New appointment scheduled with Alice Davis',
+      },
+      {
+        userId: adminUser.id,
+        type: 'SYSTEM',
+        title: 'System Update',
+        message: 'Healthcare platform updated successfully',
+      },
+    ],
+    skipDuplicates: true,
   });
 
-  await prisma.notification.create({
-    data: {
-      userId: doctor.id,
-      type: 'SYSTEM',
-      title: 'New Patient Assignment',
-      message: 'You have been assigned to patient Alice Williams',
-    },
-  });
-
-  console.log('Database seeded successfully!');
-  console.log('Sample accounts created:');
-  console.log('Admin: admin@healthcare.com / admin123');
-  console.log('CEO: ceo@healthcare.com / ceo123');
-  console.log('Doctor: doctor@healthcare.com / doctor123');
-  console.log('Patient: patient@healthcare.com / patient123');
-  console.log('Nurse: nurse@healthcare.com / nurse123');
+  console.log('✅ Database seeded successfully!');
+  console.log('\n📋 Created users:');
+  console.log('👨‍💼 Admin: ashutosh@curelex.com / admin@123');
+  console.log('👨‍⚕️ Doctor: doctor@healthcare.com / doctor123');
+  console.log('👩‍⚕️ Junior Doctor: junior.doctor@healthcare.com / doctor123');
+  console.log('👩‍⚕️ Nurse: nurse@healthcare.com / admin@123');
+  console.log('👤 Patient: patient@healthcare.com / patient123');
+  console.log('👤 Patient 2: patient2@healthcare.com / patient123');
+  console.log('👨‍💼 CEO: ceo@healthcare.com / admin@123');
 }
 
 main()
   .catch((e) => {
-    console.error(e);
+    console.error('❌ Seed failed:', e);
     process.exit(1);
   })
   .finally(async () => {

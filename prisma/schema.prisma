@@ -3,8 +3,8 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = "file:./dev.db"
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 model User {
@@ -17,6 +17,8 @@ model User {
   refreshToken     String?
   resetToken       String?
   resetTokenExpiry DateTime?
+  passwordChangedAt DateTime?
+  mustChangePassword Boolean @default(false)
   lastLoginAt      DateTime?
   emailVerifiedAt  DateTime?
   createdAt        DateTime  @default(now())

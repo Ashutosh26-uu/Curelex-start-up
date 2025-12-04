@@ -8,6 +8,7 @@ import { authApi } from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { PasswordInput } from '@/components/ui/PasswordInput';
 import { Select } from '@/components/ui/Select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Stethoscope } from 'lucide-react';
@@ -20,7 +21,7 @@ interface LoginForm {
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login } = useAuthStore();
+  const { setAuth: login } = useAuthStore();
   const [error, setError] = useState('');
 
   const { register, handleSubmit, formState: { errors } } = useForm<LoginForm>();
@@ -28,12 +29,36 @@ export default function LoginPage() {
   const loginMutation = useMutation({
     mutationFn: authApi.login,
     onSuccess: (response) => {
-      const { user, access_token } = response.data;
-      login(user, access_token);
-      router.push('/');
+      const { user, accessToken, refreshToken } = response;
+      login(user, accessToken, refreshToken);
+      
+      // Redirect based on user role
+      switch (user.role) {
+        case 'PATIENT':
+          router.push('/patient');
+          break;
+        case 'DOCTOR':
+        case 'JUNIOR_DOCTOR':
+          router.push('/doctor');
+          break;
+        case 'CEO':
+        case 'CTO':
+        case 'CFO':
+        case 'CMO':
+          router.push('/officer');
+          break;
+        case 'ADMIN':
+          router.push('/admin');
+          break;
+        case 'NURSE':
+          router.push('/vitals');
+          break;
+        default:
+          router.push('/home');
+      }
     },
     onError: (error: any) => {
-      setError(error.response?.data?.message || 'Login failed');
+      setError(error.message || 'Login failed');
     },
   });
 
@@ -90,9 +115,8 @@ export default function LoginPage() {
                 error={errors.email?.message}
               />
 
-              <Input
+              <PasswordInput
                 label="Password"
-                type="password"
                 {...register('password', { 
                   required: 'Password is required',
                   minLength: {

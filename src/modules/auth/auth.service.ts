@@ -8,6 +8,7 @@ import { RegisterDto } from './dto/register.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { NotificationService } from '../notification/notification.service';
 
@@ -216,6 +217,36 @@ export class AuthService {
     });
     
     return { message: 'Password reset successfully' };
+  }
+
+  async changePassword(userId: string, changePasswordDto: ChangePasswordDto) {
+    const { currentPassword, newPassword } = changePasswordDto;
+    
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+    
+    if (!user) {
+      throw new BadRequestException('User not found');
+    }
+    
+    const isCurrentPasswordValid = await bcrypt.compare(currentPassword, user.password);
+    if (!isCurrentPasswordValid) {
+      throw new BadRequestException('Current password is incorrect');
+    }
+    
+    const hashedNewPassword = await bcrypt.hash(newPassword, 12);
+    
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        password: hashedNewPassword,
+        passwordChangedAt: new Date(),
+        mustChangePassword: false,
+      },
+    });
+    
+    return { message: 'Password changed successfully' };
   }
 
   private async generateTokens(userId: string, email: string, role: string) {
