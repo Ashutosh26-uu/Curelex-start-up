@@ -2,6 +2,7 @@ import { Injectable, UnauthorizedException, ConflictException, BadRequestExcepti
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcryptjs';
+import { PasswordUtil } from '../../common/utils/password.util';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
@@ -51,7 +52,7 @@ export class AuthService {
     }
 
     // Verify password
-    const isPasswordValid = await bcrypt.compare(password, user.password);
+    const isPasswordValid = await PasswordUtil.compare(password, user.password);
     if (!isPasswordValid) {
       await this.incrementFailedAttempts(user.id);
       await this.logLoginAttempt(email, ipAddress, userAgent, false, 'Invalid password');
@@ -115,7 +116,7 @@ export class AuthService {
       throw new ConflictException('Email already exists');
     }
 
-    const hashedPassword = await bcrypt.hash(password, 12);
+    const hashedPassword = await PasswordUtil.hash(password);
     
     const user = await this.prisma.user.create({
       data: {
@@ -297,7 +298,7 @@ export class AuthService {
       throw new BadRequestException('Invalid or expired reset token');
     }
     
-    const hashedPassword = await bcrypt.hash(newPassword, 12);
+    const hashedPassword = await PasswordUtil.hash(newPassword);
     
     await this.prisma.user.update({
       where: { id: user.id },
@@ -322,12 +323,12 @@ export class AuthService {
       throw new BadRequestException('User not found');
     }
     
-    const isCurrentPasswordValid = await bcrypt.compare(currentPassword, user.password);
+    const isCurrentPasswordValid = await PasswordUtil.compare(currentPassword, user.password);
     if (!isCurrentPasswordValid) {
       throw new BadRequestException('Current password is incorrect');
     }
     
-    const hashedNewPassword = await bcrypt.hash(newPassword, 12);
+    const hashedNewPassword = await PasswordUtil.hash(newPassword);
     
     await this.prisma.user.update({
       where: { id: userId },

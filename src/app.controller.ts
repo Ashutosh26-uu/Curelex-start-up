@@ -5,50 +5,38 @@ import { Public } from './common/decorators/public.decorator';
 @ApiTags('System')
 @Controller()
 export class AppController {
-  @ApiOperation({ summary: 'API health check' })
-  @Public()
-  @Get('health')
-  getHealth() {
+  private readonly version = '1.0.0';
+  private readonly appName = 'Healthcare Telemedicine Platform API';
+
+  private getBaseResponse() {
     return {
-      status: 'ok',
-      message: 'Healthcare Telemedicine Platform API is running',
+      status: 'healthy',
       timestamp: new Date().toISOString(),
+      version: this.version,
     };
   }
 
-  @ApiOperation({ summary: 'API root' })
+  @ApiOperation({ summary: 'API root information' })
   @Public()
   @Get()
   getRoot() {
     return {
-      message: 'Healthcare Telemedicine Platform API',
-      version: '1.0.0',
+      message: this.appName,
+      ...this.getBaseResponse(),
       docs: '/api/docs',
       health: '/api/v1/health',
     };
   }
 
-  @ApiOperation({ summary: 'Detailed health check' })
+  @ApiOperation({ summary: 'Health check with system status' })
   @Public()
-  @Get('healthcheck')
-  getHealthCheck() {
+  @Get('api/v1/health')
+  getHealth() {
     return {
-      status: 'healthy',
+      ...this.getBaseResponse(),
+      message: `${this.appName} is running`,
       uptime: process.uptime(),
-      timestamp: new Date().toISOString(),
-    };
-  }
-
-  @ApiOperation({ summary: 'API status and endpoints' })
-  @Public()
-  @Get('status')
-  getStatus() {
-    return {
-      status: 'healthy',
-      timestamp: new Date().toISOString(),
-      version: '1.0.0',
       environment: process.env.NODE_ENV || 'development',
-      uptime: process.uptime(),
       endpoints: {
         auth: '/api/v1/auth',
         patients: '/api/v1/patients',
