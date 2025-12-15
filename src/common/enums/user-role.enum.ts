@@ -1,11 +1,14 @@
 export enum UserRole {
   PATIENT = 'PATIENT',
-  DOCTOR = 'DOCTOR',
   JUNIOR_DOCTOR = 'JUNIOR_DOCTOR',
+  SENIOR_DOCTOR = 'SENIOR_DOCTOR',
   NURSE = 'NURSE',
   CEO = 'CEO',
+  COO = 'COO',
   CTO = 'CTO',
   CFO = 'CFO',
-  CMO = 'CMO',
+  CLO = 'CLO',
+  BOD = 'BOD',
+  FOUNDER = 'FOUNDER',
   ADMIN = 'ADMIN',
 }

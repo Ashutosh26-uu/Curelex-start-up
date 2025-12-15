@@ -225,4 +225,78 @@ export class DoctorService {
       data: { isAvailable },
     });
   }
+
+  // Junior Doctor Capabilities
+  async registerPatientPhysically(juniorDoctorId: string, patientData: {
+    name: string;
+    phone: string;
+    email?: string;
+    age: number;
+    gender: string;
+    emergencyContact?: string;
+    emergencyPhone?: string;
+  }) {
+    const juniorDoctor = await this.prisma.doctor.findUnique({
+      where: { id: juniorDoctorId },
+      include: { user: true },
+    });
+
+    if (!juniorDoctor || juniorDoctor.user.role !== 'JUNIOR_DOCTOR') {
+      throw new NotFoundException('Junior doctor not found');
+    }
+
+    const patientId = `PAT${patientData.phone.slice(-6)}${Date.now().toString().slice(-4)}`;
+    const tempPassword = Math.random().toString(36).slice(-8);
+    const hashedPassword = await require('bcryptjs').hash(tempPassword, 12);
+
+    const user = await this.prisma.user.create({
+      data: {
+        email: patientData.email || `${patientId.toLowerCase()}@temp.com`,
+        password: hashedPassword,
+        role: 'PATIENT',
+        mustChangePassword: true,
+        profile: {
+          create: {
+            firstName: patientData.name.split(' ')[0],
+            lastName: patientData.name.split(' ').slice(1).join(' ') || 'Patient',
+            phone: patientData.phone,
+            gender: patientData.gender,
+            dateOfBirth: new Date(new Date().getFullYear() - patientData.age, 0, 1),
+          },
+        },
+        patient: {
+          create: {
+            patientId,
+            emergencyContact: patientData.emergencyContact,
+            emergencyPhone: patientData.emergencyPhone,
+          },
+        },
+      },
+      include: {
+        profile: true,
+        patient: true,
+      },
+    });
+
+    return { user, tempPassword };
+  }
+
+  async assignSeniorDoctor(juniorDoctorId: string, patientId: string, seniorDoctorId: string) {
+    const juniorDoctor = await this.prisma.doctor.findUnique({
+      where: { id: juniorDoctorId },
+      include: { user: true },
+    });
+
+    if (!juniorDoctor || juniorDoctor.user.role !== 'JUNIOR_DOCTOR') {
+      throw new NotFoundException('Junior doctor not found');
+    }
+
+    return this.prisma.doctorPatientAssignment.create({
+      data: {
+        doctorId: seniorDoctorId,
+        patientId,
+        assignedBy: juniorDoctor.user.id,
+      },
+    });
+  }
 }

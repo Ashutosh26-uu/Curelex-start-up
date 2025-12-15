@@ -183,4 +183,153 @@ export class AppointmentService {
       take: 5,
     });
   }
+
+  // Real-time availability view
+  async getDoctorAvailability(doctorId: string, date: Date) {
+    const startOfDay = new Date(date);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(date);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const bookedSlots = await this.prisma.appointment.findMany({
+      where: {
+        doctorId,
+        scheduledAt: {
+          gte: startOfDay,
+          lte: endOfDay,
+        },
+        status: { in: ['SCHEDULED', 'IN_PROGRESS'] },
+        isDeleted: false,
+      },
+      select: {
+        scheduledAt: true,
+        duration: true,
+      },
+    });
+
+    // Generate available slots (9 AM to 6 PM, 30-minute slots)
+    const availableSlots = [];
+    const workStart = new Date(startOfDay);
+    workStart.setHours(9, 0, 0, 0);
+    const workEnd = new Date(startOfDay);
+    workEnd.setHours(18, 0, 0, 0);
+
+    for (let time = new Date(workStart); time < workEnd; time.setMinutes(time.getMinutes() + 30)) {
+      const slotTime = new Date(time);
+      const isBooked = bookedSlots.some(slot => {
+        const slotStart = new Date(slot.scheduledAt);
+        const slotEnd = new Date(slotStart.getTime() + (slot.duration * 60000));
+        return slotTime >= slotStart && slotTime < slotEnd;
+      });
+
+      if (!isBooked) {
+        availableSlots.push({
+          time: slotTime.toISOString(),
+          available: true,
+        });
+      }
+    }
+
+    return availableSlots;
+  }
+
+  // Auto-scheduling
+  async autoScheduleAppointment(patientId: string, specialization: string, preferredDate?: Date) {
+    const searchDate = preferredDate || new Date();
+    
+    // Find available doctors with the specialization
+    const availableDoctors = await this.prisma.doctor.findMany({
+      where: {
+        specialization: { contains: specialization },
+        isAvailable: true,
+        isDeleted: false,
+      },
+      include: {
+        user: { include: { profile: true } },
+      },
+    });
+
+    if (availableDoctors.length === 0) {
+      throw new BadRequestException('No doctors available for this specialization');
+    }
+
+    // Find the earliest available slot
+    for (const doctor of availableDoctors) {
+      const availability = await this.getDoctorAvailability(doctor.id, searchDate);
+      
+      if (availability.length > 0) {
+        const earliestSlot = availability[0];
+        
+        return this.create({
+          patientId,
+          doctorId: doctor.id,
+          scheduledAt: earliestSlot.time,
+          duration: 30,
+        });
+      }
+    }
+
+    throw new BadRequestException('No available slots found');
+  }
+
+  // Waiting list management
+  async addToWaitingList(patientId: string, doctorId: string, preferredDate: Date) {
+    // In a real implementation, this would use a separate waiting_list table
+    return this.prisma.appointment.create({
+      data: {
+        patientId,
+        doctorId,
+        scheduledAt: preferredDate,
+        status: 'WAITING',
+        notes: 'Patient added to waiting list',
+      },
+    });
+  }
+
+  async processWaitingList(doctorId: string) {
+    const waitingAppointments = await this.prisma.appointment.findMany({
+      where: {
+        doctorId,
+        status: 'WAITING',
+        isDeleted: false,
+      },
+      orderBy: { createdAt: 'asc' },
+      include: {
+        patient: { include: { user: { include: { profile: true } } } },
+      },
+    });
+
+    const processedAppointments = [];
+
+    for (const waitingAppointment of waitingAppointments) {
+      try {
+        const availability = await this.getDoctorAvailability(doctorId, new Date());
+        
+        if (availability.length > 0) {
+          const updatedAppointment = await this.prisma.appointment.update({
+            where: { id: waitingAppointment.id },
+            data: {
+              scheduledAt: new Date(availability[0].time),
+              status: 'SCHEDULED',
+              notes: 'Automatically scheduled from waiting list',
+            },
+          });
+
+          // Notify patient
+          await this.notificationService.createNotification({
+            userId: waitingAppointment.patient.userId,
+            type: 'APPOINTMENT' as any,
+            title: 'Appointment Scheduled',
+            message: `Your appointment has been scheduled for ${new Date(availability[0].time).toLocaleString()}`,
+          });
+
+          processedAppointments.push(updatedAppointment);
+        }
+      } catch (error) {
+        console.error('Error processing waiting list appointment:', error);
+      }
+    }
+
+    return processedAppointments;
+  }
 }

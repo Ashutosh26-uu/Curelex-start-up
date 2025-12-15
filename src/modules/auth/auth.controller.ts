@@ -107,4 +107,48 @@ export class AuthController {
   async changePassword(@Request() req: any, @Body() changePasswordDto: ChangePasswordDto) {
     return this.authService.changePassword(req.user.id, changePasswordDto);
   }
+
+  @ApiOperation({ summary: 'Patient registration with captcha' })
+  @Public()
+  @Post('register/patient')
+  async registerPatient(@Body() patientRegisterDto: any, @Request() req: any) {
+    const ipAddress = req.ip || req.connection.remoteAddress;
+    const userAgent = req.get('User-Agent');
+    return this.authService.registerPatient(patientRegisterDto, ipAddress, userAgent);
+  }
+
+  @ApiOperation({ summary: 'Doctor registration (Junior/Senior)' })
+  @Public()
+  @Post('register/doctor')
+  async registerDoctor(@Body() doctorRegisterDto: any, @Request() req: any) {
+    const ipAddress = req.ip || req.connection.remoteAddress;
+    const userAgent = req.get('User-Agent');
+    return this.authService.registerDoctor(doctorRegisterDto, ipAddress, userAgent);
+  }
+
+  @ApiOperation({ summary: 'CXO registration (Highly secured)' })
+  @Public()
+  @Post('register/cxo')
+  async registerCxo(@Body() cxoRegisterDto: any, @Request() req: any) {
+    const ipAddress = req.ip || req.connection.remoteAddress;
+    const userAgent = req.get('User-Agent');
+    return this.authService.registerCxo(cxoRegisterDto, ipAddress, userAgent);
+  }
+
+  @ApiOperation({ summary: 'Generate captcha' })
+  @Public()
+  @Get('captcha')
+  async generateCaptcha() {
+    return this.authService.generateCaptcha();
+  }
+
+  @ApiOperation({ summary: 'Phone/Email login' })
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @Post('login/phone-email')
+  async loginWithPhoneOrEmail(@Body() loginDto: any, @Request() req: any) {
+    const ipAddress = req.ip || req.connection.remoteAddress;
+    const userAgent = req.get('User-Agent');
+    return this.authService.loginWithPhoneOrEmail(loginDto, ipAddress, userAgent);
+  }
 }

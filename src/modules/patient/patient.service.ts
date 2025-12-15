@@ -8,6 +8,12 @@ import * as bcrypt from 'bcryptjs';
 export class PatientService {
   constructor(private prisma: PrismaService) {}
 
+  private generatePatientId(phone: string): string {
+    const cleanPhone = phone.replace(/[^0-9]/g, '').slice(-10);
+    const timestamp = Date.now().toString().slice(-4);
+    return `PAT${cleanPhone.slice(-6)}${timestamp}`;
+  }
+
   async registerPatient(patientData: any) {
     const hashedPassword = await bcrypt.hash(patientData.password || '123456', 12);
     
@@ -18,6 +24,8 @@ export class PatientService {
     if (existingUser) {
       throw new Error('Email already exists');
     }
+    
+    const patientId = this.generatePatientId(patientData.phone || patientData.mobile || '');
     
     return this.prisma.user.create({
       data: {
@@ -30,11 +38,12 @@ export class PatientService {
             lastName: patientData.lastName || patientData.name?.split(' ')[1] || 'User',
             phone: patientData.mobile || patientData.phone,
             gender: patientData.gender,
+            dateOfBirth: patientData.age ? new Date(new Date().getFullYear() - patientData.age, 0, 1) : null,
           },
         },
         patient: {
           create: {
-            patientId: `PAT-${Date.now()}`,
+            patientId,
             emergencyContact: patientData.emergencyContact,
             emergencyPhone: patientData.emergencyPhone || patientData.mobile,
             allergies: patientData.medicalHistory?.join(', ') || 'None',
@@ -215,6 +224,77 @@ export class PatientService {
         pages: Math.ceil(total / limit),
       },
     };
+  }
+
+  async getFullProfile(patientId: string) {
+    return this.prisma.patient.findUnique({
+      where: { id: patientId },
+      include: {
+        user: {
+          include: {
+            profile: true,
+          },
+        },
+        medicalHistory: {
+          where: { isDeleted: false },
+          orderBy: { createdAt: 'desc' },
+        },
+        prescriptions: {
+          include: {
+            doctor: {
+              include: {
+                user: {
+                  include: {
+                    profile: true,
+                  },
+                },
+              },
+            },
+          },
+          orderBy: { createdAt: 'desc' },
+        },
+        appointments: {
+          include: {
+            doctor: {
+              include: {
+                user: {
+                  include: {
+                    profile: true,
+                  },
+                },
+              },
+            },
+          },
+          orderBy: { scheduledAt: 'desc' },
+        },
+        vitals: {
+          orderBy: { recordedAt: 'desc' },
+        },
+      },
+    });
+  }
+
+  async getFollowUpSchedule(patientId: string) {
+    return this.prisma.appointment.findMany({
+      where: {
+        patientId,
+        status: 'SCHEDULED',
+        scheduledAt: { gte: new Date() },
+        isDeleted: false,
+      },
+      include: {
+        doctor: {
+          include: {
+            user: {
+              include: {
+                profile: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: { scheduledAt: 'asc' },
+    });
   }
 
   async getPatientStats() {
