@@ -129,8 +129,6 @@ export class AppController {
         vitals: '/api/v1/vitals',
         prescriptions: '/api/v1/prescriptions',
         notifications: '/api/v1/notifications',
-        officer: '/api/v1/officer',
-        admin: '/api/v1/admin',
         integration: '/api/v1/integration',
         docs: '/api/docs',
       },

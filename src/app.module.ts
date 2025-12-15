@@ -20,11 +20,10 @@ import { RolesGuard } from './common/guards/roles.guard';
 import { AuthModule } from './modules/auth/auth.module';
 import { PatientModule } from './modules/patient/patient.module';
 import { DoctorModule } from './modules/doctor/doctor.module';
-import { OfficerModule } from './modules/officer/officer.module';
+
 import { AppointmentModule } from './modules/appointment/appointment.module';
 import { VitalsModule } from './modules/vitals/vitals.module';
 import { NotificationModule } from './modules/notification/notification.module';
-import { AdminModule } from './modules/admin/admin.module';
 import { LoggingModule } from './modules/logging/logging.module';
 import { IntegrationModule } from './modules/integration/integration.module';
 import { WebSocketModule } from './modules/websocket/websocket.module';
@@ -65,11 +64,9 @@ const featureModules = [
   AuthModule,
   PatientModule,
   DoctorModule,
-  OfficerModule,
   AppointmentModule,
   VitalsModule,
   NotificationModule,
-  AdminModule,
   LoggingModule,
   IntegrationModule,
   WebSocketModule,
