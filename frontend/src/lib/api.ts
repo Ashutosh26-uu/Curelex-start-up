@@ -93,6 +93,30 @@ class ApiClient {
 export const api = new ApiClient(API_BASE_URL);
 
 export const authApi = {
+  patientLogin: async (data: any) => {
+    const response = await api.post('/auth/login/patient', data);
+    if (response.accessToken) {
+      api.setToken(response.accessToken);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('refresh_token', response.refreshToken);
+        localStorage.setItem('session_id', response.sessionId || '');
+        localStorage.setItem('user', JSON.stringify(response.user));
+      }
+    }
+    return response;
+  },
+  doctorLogin: async (data: any) => {
+    const response = await api.post('/auth/login/doctor', data);
+    if (response.accessToken) {
+      api.setToken(response.accessToken);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('refresh_token', response.refreshToken);
+        localStorage.setItem('session_id', response.sessionId || '');
+        localStorage.setItem('user', JSON.stringify(response.user));
+      }
+    }
+    return response;
+  },
   login: async (data: any) => {
     const response = await api.post('/auth/login', data);
     if (response.accessToken) {
@@ -152,6 +176,7 @@ export const authApi = {
 };
 
 export const patientApi = {
+  selfRegister: (data: any) => api.post('/patients/self-register', data),
   register: (data: any) => api.post('/patients/register', data),
   getAll: (params?: any) => {
     const query = params ? `?${new URLSearchParams(params)}` : '';

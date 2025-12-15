@@ -5,20 +5,24 @@ export default function StaffLogin() {
   const [selectedRole, setSelectedRole] = useState('');
 
   const staffRoles = [
-    { id: 'DOCTOR', name: 'Doctor', description: 'Medical practitioners' },
+    { id: 'DOCTOR', name: 'Doctor', description: 'Senior medical practitioners' },
+    { id: 'JUNIOR_DOCTOR', name: 'Junior Doctor', description: 'Resident and junior medical staff' },
   ];
 
   const handleRoleLogin = (role: string) => {
-    // Redirect to doctor login
-    window.location.href = `/doctor-login?role=${role}`;
+    if (role === 'DOCTOR') {
+      window.location.href = `/doctor-login`;
+    } else if (role === 'JUNIOR_DOCTOR') {
+      window.location.href = `/junior-doctor-login`;
+    }
   };
 
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-4xl mx-auto">
         <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">Doctor Portal</h1>
-          <p className="text-lg text-gray-600">Select your doctor level to access the platform</p>
+          <h1 className="text-4xl font-bold text-gray-900 mb-4">Medical Staff Portal</h1>
+          <p className="text-lg text-gray-600">Select your role to access the platform</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
