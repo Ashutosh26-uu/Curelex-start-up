@@ -377,22 +377,7 @@ export class AuthService {
     });
   }
 
-  private async generateTokens(userId: string, email: string, role: string, sessionId?: string) {
-    const payload = { sub: userId, email, role };
-    
-    const [accessToken, refreshToken] = await Promise.all([
-      this.jwtService.signAsync(payload, {
-        secret: this.configService.get('JWT_SECRET'),
-        expiresIn: this.configService.get('JWT_EXPIRES_IN'),
-      }),
-      this.jwtService.signAsync(payload, {
-        secret: this.configService.get('JWT_REFRESH_SECRET'),
-        expiresIn: this.configService.get('JWT_REFRESH_EXPIRES_IN'),
-      }),
-    ]);
-    
-    return { accessToken, refreshToken };
-  }
+
 
   private generateSessionId(): string {
     return `sess_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
@@ -490,7 +475,6 @@ export class AuthService {
     });
   }
 
-  // Public method for token generation (used by auto-refresh)
   async generateTokens(userId: string, email: string, role: string, sessionId?: string) {
     const payload = { sub: userId, email, role, sessionId };
     
@@ -506,6 +490,18 @@ export class AuthService {
     ]);
     
     return { accessToken, refreshToken };
+  }
+
+  async registerPatient(data: any, ipAddress?: string, userAgent?: string) {
+    return this.register({ ...data, role: UserRole.PATIENT });
+  }
+
+  async registerDoctor(data: any, ipAddress?: string, userAgent?: string) {
+    return this.register({ ...data, role: UserRole.DOCTOR });
+  }
+
+  async loginWithPhoneOrEmail(loginDto: any, ipAddress?: string, userAgent?: string) {
+    return this.login(loginDto, ipAddress, userAgent);
   }
 
   async generateCaptcha() {
@@ -532,8 +528,8 @@ export class AuthService {
   async doctorLogin(loginDto: any, ipAddress?: string, userAgent?: string) {
     const result = await this.login(loginDto, ipAddress, userAgent);
     
-    // Validate user is doctor
-    if (result.user.role !== 'DOCTOR') {
+    // Validate user is doctor or junior doctor
+    if (!['DOCTOR', 'JUNIOR_DOCTOR'].includes(result.user.role)) {
       throw new UnauthorizedException('Invalid portal access');
     }
     

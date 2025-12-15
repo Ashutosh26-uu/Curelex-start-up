@@ -27,7 +27,7 @@ class EnvironmentVariables {
   @IsOptional()
   NODE_ENV: string = 'development';
 
-  @IsUrl()
+  @IsString()
   @IsOptional()
   FRONTEND_URL: string = 'http://localhost:3001';
 

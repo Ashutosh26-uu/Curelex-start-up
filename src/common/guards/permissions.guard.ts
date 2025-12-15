@@ -24,7 +24,7 @@ export class PermissionsGuard implements CanActivate {
   }
 
   private getUserPermissions(role: UserRole): string[] {
-    const permissions: Record<UserRole, string[]> = {
+    const permissions: Partial<Record<UserRole, string[]>> = {
       [UserRole.PATIENT]: [
         'read:own-profile',
         'update:own-profile',

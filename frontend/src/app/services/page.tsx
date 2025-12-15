@@ -93,9 +93,6 @@ export default function Services() {
                   <ul className="text-sm text-gray-600 space-y-1">
                     <li>• Doctors & Junior Doctors</li>
                     <li>• Nurses & Medical Staff</li>
-                    <li>• Directors & Administrators</li>
-                    <li>• CXOs (CEO, CTO, CFO, CMO)</li>
-                    <li>• System Administrators</li>
                   </ul>
                 </div>
               </div>

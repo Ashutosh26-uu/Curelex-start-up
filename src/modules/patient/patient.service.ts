@@ -17,6 +17,10 @@ export class PatientService {
   async registerPatient(patientData: any) {
     const hashedPassword = await bcrypt.hash(patientData.password || '123456', 12);
     
+    if (!patientData.email) {
+      throw new Error('Email is required');
+    }
+    
     const existingUser = await this.prisma.user.findUnique({ 
       where: { email: patientData.email } 
     });
@@ -311,5 +315,39 @@ export class PatientService {
     ]);
 
     return { total, active, unassigned, newThisMonth };
+  }
+
+  async selfRegisterPatient(patientData: any) {
+    return this.registerPatient(patientData);
+  }
+
+  async assistedRegisterPatient(patientData: any, assistedBy: string) {
+    const result = await this.registerPatient(patientData);
+    // Log assisted registration
+    return result;
+  }
+
+  async findByPhoneId(phoneId: string) {
+    return this.prisma.patient.findFirst({
+      where: {
+        OR: [
+          { patientId: phoneId },
+          { user: { profile: { phone: phoneId } } },
+        ],
+      },
+      include: {
+        user: { include: { profile: true } },
+      },
+    });
+  }
+
+  async updateMedicalDetails(patientId: string, medicalData: any) {
+    return this.prisma.patient.update({
+      where: { id: patientId },
+      data: {
+        allergies: medicalData.allergies,
+        chronicConditions: medicalData.chronicConditions,
+      },
+    });
   }
 }

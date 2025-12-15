@@ -148,14 +148,7 @@ export class AuthController {
     return this.authService.registerDoctor(doctorRegisterDto, ipAddress, userAgent);
   }
 
-  @ApiOperation({ summary: 'CXO registration (Highly secured)' })
-  @Public()
-  @Post('register/cxo')
-  async registerCxo(@Body() cxoRegisterDto: any, @Request() req: any) {
-    const ipAddress = req.ip || req.connection.remoteAddress;
-    const userAgent = req.get('User-Agent');
-    return this.authService.registerCxo(cxoRegisterDto, ipAddress, userAgent);
-  }
+
 
   @ApiOperation({ summary: 'Auto refresh token if near expiry' })
   @ApiBearerAuth()
