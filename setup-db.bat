@@ -1,0 +1,19 @@
+@echo off
+echo Setting up database...
+
+echo 1. Starting Docker services...
+docker-compose -f docker-compose.dev.yml up -d
+
+echo 2. Waiting for database...
+timeout /t 15 /nobreak > nul
+
+echo 3. Generating Prisma client...
+npx prisma generate
+
+echo 4. Running migrations...
+npx prisma migrate dev --name init --skip-seed
+
+echo 5. Seeding database...
+npx ts-node prisma/seed.ts
+
+echo Database setup complete!

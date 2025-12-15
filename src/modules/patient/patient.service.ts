@@ -11,6 +11,14 @@ export class PatientService {
   async registerPatient(patientData: any) {
     const hashedPassword = await bcrypt.hash(patientData.password || '123456', 12);
     
+    const existingUser = await this.prisma.user.findUnique({ 
+      where: { email: patientData.email } 
+    });
+    
+    if (existingUser) {
+      throw new Error('Email already exists');
+    }
+    
     return this.prisma.user.create({
       data: {
         email: patientData.email,
@@ -28,7 +36,7 @@ export class PatientService {
           create: {
             patientId: `PAT-${Date.now()}`,
             emergencyContact: patientData.emergencyContact,
-            emergencyPhone: patientData.emergencyPhone,
+            emergencyPhone: patientData.emergencyPhone || patientData.mobile,
             allergies: patientData.medicalHistory?.join(', ') || 'None',
           },
         },

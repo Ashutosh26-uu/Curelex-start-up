@@ -18,7 +18,7 @@ interface PatientLoginForm {
 
 export default function PatientLoginPage() {
   const router = useRouter();
-  const { login } = useAuthStore();
+  const { setAuth } = useAuthStore();
   const [error, setError] = useState('');
 
   const { register, handleSubmit, formState: { errors } } = useForm<PatientLoginForm>();
@@ -26,16 +26,16 @@ export default function PatientLoginPage() {
   const loginMutation = useMutation({
     mutationFn: authApi.login,
     onSuccess: (response) => {
-      const { user, access_token } = response.data;
+      const { user, accessToken, refreshToken } = response;
       if (user.role !== 'PATIENT') {
         setError('This login is only for patients. Please use staff login.');
         return;
       }
-      login(user, access_token);
+      setAuth(user, accessToken, refreshToken);
       router.push('/patient');
     },
     onError: (error: any) => {
-      setError(error.response?.data?.message || 'Login failed');
+      setError(error.message || 'Login failed');
     },
   });
 

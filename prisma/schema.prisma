@@ -14,13 +14,25 @@ model User {
   role             String
   isActive         Boolean   @default(true)
   isDeleted        Boolean   @default(false)
+  isLocked         Boolean   @default(false)
+  lockReason       String?
   refreshToken     String?
   resetToken       String?
   resetTokenExpiry DateTime?
   passwordChangedAt DateTime?
   mustChangePassword Boolean @default(false)
+  failedLoginAttempts Int    @default(0)
+  lastFailedLoginAt DateTime?
   lastLoginAt      DateTime?
+  lastLogoutAt     DateTime?
   emailVerifiedAt  DateTime?
+  twoFactorEnabled Boolean   @default(false)
+  twoFactorSecret  String?
+  backupCodes      String?
+  sessionId        String?
+  ipAddress        String?
+  userAgent        String?
+  loginCount       Int       @default(0)
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
   deletedAt        DateTime?
@@ -30,8 +42,43 @@ model User {
   doctor        Doctor?
   officer       Officer?
   notifications Notification[]
+  sessions      UserSession[]
+  loginHistory  LoginHistory[]
 
   @@map("users")
+}
+
+model UserSession {
+  id          String   @id @default(cuid())
+  userId      String
+  sessionId   String   @unique
+  ipAddress   String?
+  userAgent   String?
+  isActive    Boolean  @default(true)
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_sessions")
+}
+
+model LoginHistory {
+  id          String   @id @default(cuid())
+  userId      String?
+  email       String
+  ipAddress   String?
+  userAgent   String?
+  success     Boolean
+  failReason  String?
+  location    String?
+  device      String?
+  createdAt   DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@map("login_history")
 }
 
 model Profile {

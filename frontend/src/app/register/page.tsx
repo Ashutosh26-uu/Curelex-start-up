@@ -9,7 +9,7 @@ import { Select } from '@/components/ui/Select';
 import { Textarea } from '@/components/ui/Textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Stethoscope } from 'lucide-react';
-import { api } from '@/lib/api';
+import { patientApi } from '@/lib/api';
 
 interface RegisterForm {
   firstName: string;
@@ -46,11 +46,11 @@ export default function RegisterPage() {
         name: `${data.firstName} ${data.middleName ? data.middleName + ' ' : ''}${data.lastName}`,
         medicalHistory: []
       };
-      await api.post('/patients/register', payload);
+      await patientApi.register(payload);
       setSuccess(true);
       setTimeout(() => router.push('/patient-login'), 3000);
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Registration failed');
+      setError(err.message || 'Registration failed');
     } finally {
       setLoading(false);
     }

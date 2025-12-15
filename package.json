@@ -57,7 +57,7 @@
     "winston": "^3.11.0"
   },
   "prisma": {
-    "seed": "ts-node prisma/seed.ts"
+    "seed": "node prisma/simple-seed.js"
   },
   "devDependencies": {
     "@nestjs/cli": "^10.0.0",

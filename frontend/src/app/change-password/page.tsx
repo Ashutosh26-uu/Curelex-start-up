@@ -74,8 +74,10 @@ export default function ChangePasswordPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <button
+                  type="button"
                   onClick={() => router.back()}
                   className="text-gray-400 hover:text-gray-600"
+                  aria-label="Go back"
                 >
                   <ArrowLeft className="h-5 w-5" />
                 </button>

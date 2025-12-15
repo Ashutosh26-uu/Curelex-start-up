@@ -23,14 +23,26 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       include: { profile: true, patient: true, doctor: true, officer: true },
     });
 
-    if (!user || !user.isActive) {
-      throw new UnauthorizedException();
+    if (!user || !user.isActive || user.isLocked) {
+      throw new UnauthorizedException('Account not accessible');
+    }
+
+    // Validate session if sessionId is present
+    if (payload.sessionId) {
+      const session = await this.prisma.userSession.findUnique({
+        where: { sessionId: payload.sessionId },
+      });
+      
+      if (!session || !session.isActive || session.expiresAt < new Date()) {
+        throw new UnauthorizedException('Session expired or invalid');
+      }
     }
 
     return {
       id: user.id,
       email: user.email,
       role: user.role,
+      sessionId: payload.sessionId,
       profile: user.profile,
       patient: user.patient,
       doctor: user.doctor,

@@ -1,5 +1,10 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
 
+// Add request interceptor for debugging
+if (typeof window !== 'undefined') {
+  console.log('API Base URL:', API_BASE_URL);
+}
+
 class ApiClient {
   private baseURL: string;
   private token: string | null = null;
@@ -94,6 +99,7 @@ export const authApi = {
       api.setToken(response.accessToken);
       if (typeof window !== 'undefined') {
         localStorage.setItem('refresh_token', response.refreshToken);
+        localStorage.setItem('session_id', response.sessionId || '');
         localStorage.setItem('user', JSON.stringify(response.user));
       }
     }
@@ -117,6 +123,15 @@ export const authApi = {
       api.clearToken();
     }
   },
+  logoutAll: async () => {
+    try {
+      await api.post('/auth/logout-all', {});
+    } finally {
+      api.clearToken();
+    }
+  },
+  getSessions: () => api.get('/auth/sessions'),
+  getLoginHistory: () => api.get('/auth/login-history'),
   getProfile: () => api.get('/auth/me'),
   refreshToken: async () => {
     const refreshToken = typeof window !== 'undefined' ? localStorage.getItem('refresh_token') : null;

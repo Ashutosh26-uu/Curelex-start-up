@@ -21,7 +21,7 @@ interface LoginForm {
 
 export default function LoginPage() {
   const router = useRouter();
-  const { setAuth: login } = useAuthStore();
+  const { setAuth } = useAuthStore();
   const [error, setError] = useState('');
 
   const { register, handleSubmit, formState: { errors } } = useForm<LoginForm>();
@@ -30,7 +30,7 @@ export default function LoginPage() {
     mutationFn: authApi.login,
     onSuccess: (response) => {
       const { user, accessToken, refreshToken } = response;
-      login(user, accessToken, refreshToken);
+      setAuth(user, accessToken, refreshToken);
       
       // Redirect based on user role
       switch (user.role) {

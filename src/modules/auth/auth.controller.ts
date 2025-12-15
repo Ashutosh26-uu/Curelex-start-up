@@ -19,8 +19,10 @@ export class AuthController {
   @Public()
   @HttpCode(HttpStatus.OK)
   @Post('login')
-  async login(@Body() loginDto: LoginDto) {
-    return this.authService.login(loginDto);
+  async login(@Body() loginDto: LoginDto, @Request() req: any) {
+    const ipAddress = req.ip || req.connection.remoteAddress;
+    const userAgent = req.get('User-Agent');
+    return this.authService.login(loginDto, ipAddress, userAgent);
   }
 
   @ApiOperation({ summary: 'User registration' })
@@ -44,7 +46,33 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @Post('logout')
   async logout(@Request() req: any) {
-    return this.authService.logout(req.user.id);
+    const sessionId = req.user.sessionId;
+    return this.authService.logout(req.user.id, sessionId);
+  }
+
+  @ApiOperation({ summary: 'Logout from all sessions' })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  @Post('logout-all')
+  async logoutAll(@Request() req: any) {
+    return this.authService.logoutAllSessions(req.user.id);
+  }
+
+  @ApiOperation({ summary: 'Get active sessions' })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @Get('sessions')
+  async getSessions(@Request() req: any) {
+    return this.authService.getActiveSessions(req.user.id);
+  }
+
+  @ApiOperation({ summary: 'Get login history' })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @Get('login-history')
+  async getLoginHistory(@Request() req: any) {
+    return this.authService.getLoginHistory(req.user.id);
   }
 
   @ApiOperation({ summary: 'Get current user profile' })

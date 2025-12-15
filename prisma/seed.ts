@@ -198,21 +198,30 @@ async function main() {
     },
   });
 
+  // Get doctor and patient records
+  const doctorRecord = await prisma.doctor.findUnique({ where: { userId: doctorUser.id } });
+  const patientRecord = await prisma.patient.findUnique({ where: { userId: patientUser.id } });
+  const patient2Record = await prisma.patient.findUnique({ where: { userId: patient2User.id } });
+
+  if (!doctorRecord || !patientRecord || !patient2Record) {
+    throw new Error('Failed to find created records');
+  }
+
   // Assign Doctor to Patients
-  await prisma.doctorPatientAssignment.createMany({
-    data: [
-      {
-        doctorId: doctorUser.doctor!.id,
-        patientId: patientUser.patient!.id,
-        assignedBy: adminUser.id,
-      },
-      {
-        doctorId: doctorUser.doctor!.id,
-        patientId: patient2User.patient!.id,
-        assignedBy: adminUser.id,
-      },
-    ],
-    skipDuplicates: true,
+  await prisma.doctorPatientAssignment.create({
+    data: {
+      doctorId: doctorRecord.id,
+      patientId: patientRecord.id,
+      assignedBy: adminUser.id,
+    },
+  });
+
+  await prisma.doctorPatientAssignment.create({
+    data: {
+      doctorId: doctorRecord.id,
+      patientId: patient2Record.id,
+      assignedBy: adminUser.id,
+    },
   });
 
   // Create Sample Appointments
@@ -224,137 +233,143 @@ async function main() {
   nextWeek.setDate(nextWeek.getDate() + 7);
   nextWeek.setHours(14, 0, 0, 0);
 
-  await prisma.appointment.createMany({
-    data: [
-      {
-        patientId: patientUser.patient!.id,
-        doctorId: doctorUser.doctor!.id,
-        scheduledAt: tomorrow,
-        duration: 30,
-        status: 'SCHEDULED',
-        notes: 'Regular checkup',
-        meetLink: 'https://meet.google.com/abc-defg-hij',
-      },
-      {
-        patientId: patient2User.patient!.id,
-        doctorId: doctorUser.doctor!.id,
-        scheduledAt: nextWeek,
-        duration: 45,
-        status: 'SCHEDULED',
-        notes: 'Follow-up consultation',
-        meetLink: 'https://meet.google.com/xyz-uvwx-yzab',
-      },
-    ],
-    skipDuplicates: true,
+  await prisma.appointment.create({
+    data: {
+      patientId: patientRecord.id,
+      doctorId: doctorRecord.id,
+      scheduledAt: tomorrow,
+      duration: 30,
+      status: 'SCHEDULED',
+      notes: 'Regular checkup',
+      meetLink: 'https://meet.google.com/abc-defg-hij',
+    },
+  });
+
+  await prisma.appointment.create({
+    data: {
+      patientId: patient2Record.id,
+      doctorId: doctorRecord.id,
+      scheduledAt: nextWeek,
+      duration: 45,
+      status: 'SCHEDULED',
+      notes: 'Follow-up consultation',
+      meetLink: 'https://meet.google.com/xyz-uvwx-yzab',
+    },
   });
 
   // Create Sample Vitals
-  await prisma.vital.createMany({
-    data: [
-      {
-        patientId: patientUser.patient!.id,
-        doctorId: doctorUser.doctor!.id,
-        type: 'BLOOD_PRESSURE',
-        value: '120/80',
-        unit: 'mmHg',
-        recordedBy: nurseUser.id,
-        notes: 'Normal blood pressure',
-      },
-      {
-        patientId: patientUser.patient!.id,
-        doctorId: doctorUser.doctor!.id,
-        type: 'HEART_RATE',
-        value: '72',
-        unit: 'bpm',
-        recordedBy: nurseUser.id,
-        notes: 'Normal heart rate',
-      },
-      {
-        patientId: patient2User.patient!.id,
-        doctorId: doctorUser.doctor!.id,
-        type: 'BLOOD_PRESSURE',
-        value: '130/85',
-        unit: 'mmHg',
-        recordedBy: nurseUser.id,
-        notes: 'Slightly elevated',
-      },
-    ],
-    skipDuplicates: true,
+  await prisma.vital.create({
+    data: {
+      patientId: patientRecord.id,
+      doctorId: doctorRecord.id,
+      type: 'BLOOD_PRESSURE',
+      value: '120/80',
+      unit: 'mmHg',
+      recordedBy: nurseUser.id,
+      notes: 'Normal blood pressure',
+    },
+  });
+
+  await prisma.vital.create({
+    data: {
+      patientId: patientRecord.id,
+      doctorId: doctorRecord.id,
+      type: 'HEART_RATE',
+      value: '72',
+      unit: 'bpm',
+      recordedBy: nurseUser.id,
+      notes: 'Normal heart rate',
+    },
+  });
+
+  await prisma.vital.create({
+    data: {
+      patientId: patient2Record.id,
+      doctorId: doctorRecord.id,
+      type: 'BLOOD_PRESSURE',
+      value: '130/85',
+      unit: 'mmHg',
+      recordedBy: nurseUser.id,
+      notes: 'Slightly elevated',
+    },
   });
 
   // Create Sample Medical History
-  await prisma.medicalHistory.createMany({
-    data: [
-      {
-        patientId: patientUser.patient!.id,
-        condition: 'Hypertension',
-        diagnosis: 'Essential hypertension',
-        treatment: 'Lifestyle modifications and medication',
-        severity: 'Mild',
-        diagnosedAt: new Date('2023-01-15'),
-      },
-      {
-        patientId: patient2User.patient!.id,
-        condition: 'Diabetes Type 2',
-        diagnosis: 'Type 2 Diabetes Mellitus',
-        treatment: 'Metformin and diet control',
-        severity: 'Moderate',
-        diagnosedAt: new Date('2022-06-10'),
-      },
-    ],
-    skipDuplicates: true,
+  await prisma.medicalHistory.create({
+    data: {
+      patientId: patientRecord.id,
+      condition: 'Hypertension',
+      diagnosis: 'Essential hypertension',
+      treatment: 'Lifestyle modifications and medication',
+      severity: 'Mild',
+      diagnosedAt: new Date('2023-01-15'),
+    },
+  });
+
+  await prisma.medicalHistory.create({
+    data: {
+      patientId: patient2Record.id,
+      condition: 'Diabetes Type 2',
+      diagnosis: 'Type 2 Diabetes Mellitus',
+      treatment: 'Metformin and diet control',
+      severity: 'Moderate',
+      diagnosedAt: new Date('2022-06-10'),
+    },
   });
 
   // Create Sample Prescriptions
-  await prisma.prescription.createMany({
-    data: [
-      {
-        patientId: patientUser.patient!.id,
-        doctorId: doctorUser.doctor!.id,
-        medication: 'Lisinopril',
-        dosage: '10mg',
-        frequency: 'Once daily',
-        duration: '30 days',
-        instructions: 'Take with food',
-        status: 'ACTIVE',
-      },
-      {
-        patientId: patient2User.patient!.id,
-        doctorId: doctorUser.doctor!.id,
-        medication: 'Metformin',
-        dosage: '500mg',
-        frequency: 'Twice daily',
-        duration: '90 days',
-        instructions: 'Take with meals',
-        status: 'ACTIVE',
-      },
-    ],
-    skipDuplicates: true,
+  await prisma.prescription.create({
+    data: {
+      patientId: patientRecord.id,
+      doctorId: doctorRecord.id,
+      medication: 'Lisinopril',
+      dosage: '10mg',
+      frequency: 'Once daily',
+      duration: '30 days',
+      instructions: 'Take with food',
+      status: 'ACTIVE',
+    },
+  });
+
+  await prisma.prescription.create({
+    data: {
+      patientId: patient2Record.id,
+      doctorId: doctorRecord.id,
+      medication: 'Metformin',
+      dosage: '500mg',
+      frequency: 'Twice daily',
+      duration: '90 days',
+      instructions: 'Take with meals',
+      status: 'ACTIVE',
+    },
   });
 
   // Create Sample Notifications
-  await prisma.notification.createMany({
-    data: [
-      {
-        userId: patientUser.id,
-        type: 'APPOINTMENT',
-        title: 'Upcoming Appointment',
-        message: 'You have an appointment tomorrow at 10:00 AM',
-      },
-      {
-        userId: doctorUser.id,
-        type: 'APPOINTMENT',
-        title: 'New Appointment',
-        message: 'New appointment scheduled with Alice Davis',
-      },
-      {
-        userId: adminUser.id,
-        type: 'SYSTEM',
-        title: 'System Update',
-        message: 'Healthcare platform updated successfully',
-      },
-    ],
-    skipDuplicates: true,
+  await prisma.notification.create({
+    data: {
+      userId: patientUser.id,
+      type: 'APPOINTMENT',
+      title: 'Upcoming Appointment',
+      message: 'You have an appointment tomorrow at 10:00 AM',
+    },
+  });
+
+  await prisma.notification.create({
+    data: {
+      userId: doctorUser.id,
+      type: 'APPOINTMENT',
+      title: 'New Appointment',
+      message: 'New appointment scheduled with Alice Davis',
+    },
+  });
+
+  await prisma.notification.create({
+    data: {
+      userId: adminUser.id,
+      type: 'SYSTEM',
+      title: 'System Update',
+      message: 'Healthcare platform updated successfully',
+    },
   });
 
   console.log('✅ Database seeded successfully!');
