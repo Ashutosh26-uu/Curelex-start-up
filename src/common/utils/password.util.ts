@@ -6,7 +6,9 @@ export class PasswordUtil {
   private static readonly MAX_LENGTH = 128;
 
   static async hash(password: string): Promise<string> {
-    this.validatePassword(password);
+    if (process.env.NODE_ENV !== 'development') {
+      this.validatePassword(password);
+    }
     return bcrypt.hash(password, this.SALT_ROUNDS);
   }
 

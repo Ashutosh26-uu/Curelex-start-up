@@ -111,73 +111,78 @@ export class AuthService {
   async register(registerDto: RegisterDto) {
     const { email, password, role, firstName, lastName, ...profileData } = registerDto;
     
-    const existingUser = await this.prisma.user.findUnique({ where: { email } });
-    if (existingUser) {
-      throw new ConflictException('Email already exists');
-    }
+    return await this.prisma.$transaction(async (tx) => {
+      const existingUser = await tx.user.findUnique({ where: { email } });
+      if (existingUser) {
+        throw new ConflictException('Email already exists');
+      }
 
-    const hashedPassword = await PasswordUtil.hash(password);
-    
-    const user = await this.prisma.user.create({
-      data: {
-        email,
-        password: hashedPassword,
-        role,
-        profile: {
-          create: {
-            firstName,
-            lastName,
-            ...profileData,
+      const hashedPassword = await PasswordUtil.hash(password);
+      
+      const user = await tx.user.create({
+        data: {
+          email,
+          password: hashedPassword,
+          role,
+          profile: {
+            create: {
+              firstName,
+              lastName,
+              ...profileData,
+            },
           },
+          ...(role === UserRole.PATIENT && {
+            patient: {
+              create: {
+                patientId: `PAT-${Date.now()}`,
+              },
+            },
+          }),
+          ...(role === UserRole.DOCTOR && {
+            doctor: {
+              create: {
+                doctorId: `DOC-${Date.now()}`,
+                specialization: registerDto.specialization || 'General',
+                licenseNumber: registerDto.licenseNumber || `LIC-${Date.now()}`,
+                experience: registerDto.experience || 0,
+                consultationFee: registerDto.consultationFee || 100,
+              },
+            },
+          }),
+          ...([UserRole.CEO, UserRole.CTO, UserRole.CFO, UserRole.CMO].includes(role as UserRole) && {
+            officer: {
+              create: {
+                officerId: `OFF-${Date.now()}`,
+                department: registerDto.department,
+                position: role,
+              },
+            },
+          }),
         },
-        ...(role === UserRole.PATIENT && {
-          patient: {
-            create: {
-              patientId: `PAT-${Date.now()}`,
-            },
-          },
-        }),
-        ...(role === UserRole.DOCTOR && {
-          doctor: {
-            create: {
-              doctorId: `DOC-${Date.now()}`,
-              specialization: registerDto.specialization || 'General',
-              licenseNumber: registerDto.licenseNumber || `LIC-${Date.now()}`,
-              experience: registerDto.experience || 0,
-              consultationFee: registerDto.consultationFee || 100,
-            },
-          },
-        }),
-        ...([UserRole.CEO, UserRole.CTO, UserRole.CFO, UserRole.CMO].includes(role as UserRole) && {
-          officer: {
-            create: {
-              officerId: `OFF-${Date.now()}`,
-              department: registerDto.department,
-              position: role,
-            },
-          },
-        }),
-      },
-      include: { profile: true, patient: true, doctor: true, officer: true },
+        include: { profile: true, patient: true, doctor: true, officer: true },
+      });
+
+      // Send notification after transaction commits
+      setImmediate(() => {
+        this.notificationService.sendWelcomeNotification(user.id, firstName).catch(console.error);
+      });
+
+      const tokens = await this.generateTokens(user.id, user.email, user.role);
+      
+      return {
+        user: {
+          id: user.id,
+          email: user.email,
+          role: user.role,
+          profile: user.profile,
+          patient: user.patient,
+          doctor: user.doctor,
+          officer: user.officer,
+        },
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+      };
     });
-
-    await this.notificationService.sendWelcomeNotification(user.id, firstName);
-
-    const tokens = await this.generateTokens(user.id, user.email, user.role);
-    
-    return {
-      user: {
-        id: user.id,
-        email: user.email,
-        role: user.role,
-        profile: user.profile,
-        patient: user.patient,
-        doctor: user.doctor,
-        officer: user.officer,
-      },
-      accessToken: tokens.accessToken,
-      refreshToken: tokens.refreshToken,
-    };
   }
 
   async refreshTokens(refreshTokenDto: RefreshTokenDto) {
@@ -228,6 +233,7 @@ export class AuthService {
         }
       };
     } catch (error) {
+      console.error('Refresh token validation failed:', error.message);
       throw new UnauthorizedException('Invalid refresh token');
     }
   }
@@ -294,7 +300,7 @@ export class AuthService {
       return { message: 'If email exists, reset link has been sent' };
     }
     
-    const resetToken = Math.random().toString(36).substring(2, 15);
+    const resetToken = require('crypto').randomBytes(32).toString('hex');
     const resetTokenExpiry = new Date(Date.now() + 15 * 60 * 1000);
     
     await this.prisma.user.update({
@@ -384,23 +390,25 @@ export class AuthService {
   }
 
   private async createUserSession(userId: string, sessionId: string, ipAddress?: string, userAgent?: string) {
-    // First, deactivate any existing sessions for this user
-    await this.prisma.userSession.updateMany({
-      where: { userId, isActive: true },
-      data: { isActive: false }
-    });
-    
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 30); // 30 days
-    
-    return this.prisma.userSession.create({
-      data: {
-        userId,
-        sessionId,
-        ipAddress,
-        userAgent,
-        expiresAt,
-      },
+    return await this.prisma.$transaction(async (tx) => {
+      // First, deactivate any existing sessions for this user
+      await tx.userSession.updateMany({
+        where: { userId, isActive: true },
+        data: { isActive: false }
+      });
+      
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 30); // 30 days
+      
+      return tx.userSession.create({
+        data: {
+          userId,
+          sessionId,
+          ipAddress,
+          userAgent,
+          expiresAt,
+        },
+      });
     });
   }
 

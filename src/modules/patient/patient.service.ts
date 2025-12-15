@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { CreatePatientDto } from './dto/create-patient.dto';
 import { UpdatePatientDto } from './dto/update-patient.dto';
@@ -15,10 +15,11 @@ export class PatientService {
   }
 
   async registerPatient(patientData: any) {
-    const hashedPassword = await bcrypt.hash(patientData.password || '123456', 12);
+    const defaultPassword = 'patient123';
+    const hashedPassword = await bcrypt.hash(patientData.password || defaultPassword, 12);
     
     if (!patientData.email) {
-      throw new Error('Email is required');
+      throw new BadRequestException('Email is required');
     }
     
     const existingUser = await this.prisma.user.findUnique({ 
@@ -26,7 +27,7 @@ export class PatientService {
     });
     
     if (existingUser) {
-      throw new Error('Email already exists');
+      throw new BadRequestException('Email already exists');
     }
     
     const patientId = this.generatePatientId(patientData.phone || patientData.mobile || '');

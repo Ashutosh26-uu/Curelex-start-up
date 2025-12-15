@@ -5,14 +5,14 @@ import { Public } from './common/decorators/public.decorator';
 @ApiTags('System')
 @Controller()
 export class AppController {
-  private readonly version = '1.0.0';
-  private readonly appName = 'Healthcare Telemedicine Platform API';
+  private readonly APP_VERSION = '1.0.0';
+  private readonly APP_NAME = 'Healthcare Telemedicine Platform API';
 
-  private getBaseResponse() {
+  private createBaseResponse() {
     return {
       status: 'healthy',
       timestamp: new Date().toISOString(),
-      version: this.version,
+      version: this.APP_VERSION,
     };
   }
 
@@ -24,7 +24,7 @@ export class AppController {
       company: 'Curelex HealthTech',
       tagline: 'Advanced Healthcare Solutions',
       message: 'Welcome to Curelex HealthTech - Your Digital Healthcare Partner',
-      ...this.getBaseResponse(),
+      ...this.createBaseResponse(),
       portals: {
         patient: '/patient-portal',
         doctor: '/doctor-portal'
@@ -112,13 +112,24 @@ export class AppController {
     };
   }
 
+  @ApiOperation({ summary: 'Health check' })
+  @Public()
+  @Get('health')
+  getHealthCheck() {
+    return {
+      status: 'healthy',
+      timestamp: new Date().toISOString(),
+      service: 'Healthcare Telemedicine API'
+    };
+  }
+
   @ApiOperation({ summary: 'Health check with system status' })
   @Public()
   @Get('api/v1/health')
   getHealth() {
     return {
-      ...this.getBaseResponse(),
-      message: `${this.appName} is running`,
+      ...this.createBaseResponse(),
+      message: `${this.APP_NAME} is running`,
       uptime: process.uptime(),
       environment: process.env.NODE_ENV || 'development',
       endpoints: {

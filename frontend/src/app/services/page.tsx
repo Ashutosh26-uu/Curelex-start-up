@@ -1,19 +1,12 @@
 'use client';
 import Navbar from '../../components/layout/Navbar';
+import styles from './page.module.css';
 
 export default function Services() {
   return (
     <div className="min-h-screen bg-gray-50 relative">
       {/* Background Watermark */}
-      <div 
-        className="fixed inset-0 opacity-5 pointer-events-none z-0"
-        style={{
-          backgroundImage: 'url(/images/crelex.jpg)',
-          backgroundRepeat: 'no-repeat',
-          backgroundPosition: 'center',
-          backgroundSize: '300px 300px'
-        }}
-      />
+      <div className={`fixed inset-0 opacity-5 pointer-events-none z-0 ${styles.backgroundImage}`} />
       <Navbar />
       <div className="relative z-10">
       

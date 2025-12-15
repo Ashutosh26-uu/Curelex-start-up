@@ -47,7 +47,7 @@ const coreModules = [
   PassportModule,
   JwtModule.register({
     global: true,
-    secret: process.env.JWT_SECRET || 'healthcare-secret',
+    secret: process.env.JWT_SECRET,
     signOptions: { expiresIn: '24h' },
   }),
   CacheModule.register({

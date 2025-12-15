@@ -21,8 +21,8 @@ async function bootstrap() {
 
   app.enableCors({
     origin: process.env.NODE_ENV === 'production' 
-      ? [process.env.FRONTEND_URL || 'http://localhost:3001']
-      : true,
+      ? [process.env.FRONTEND_URL]
+      : ['http://localhost:3000', 'http://localhost:3001'],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
@@ -48,10 +48,9 @@ async function bootstrap() {
   console.log(`📚 API Documentation: http://localhost:${port}/api/docs`);
   console.log(`🏥 Health Check: http://localhost:${port}/health`);
   console.log('==========================================');
-  console.log('\n📋 Login Credentials:');
-  console.log('👨💼 Admin: ashutosh@curelex.com / admin@123');
-  console.log('👨⚕️ Doctor: doctor@healthcare.com / doctor123');
-  console.log('👤 Patient: patient@healthcare.com / patient123');
-  console.log('==========================================\n');
+  if (process.env.NODE_ENV === 'development') {
+    console.log('\n📋 Development Mode - Check .env for credentials');
+    console.log('==========================================\n');
+  }
 }
 bootstrap();

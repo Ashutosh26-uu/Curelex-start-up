@@ -1,4 +1,4 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
 
 // Add request interceptor for debugging
 if (typeof window !== 'undefined') {
@@ -92,8 +92,20 @@ class ApiClient {
 
 export const api = new ApiClient(API_BASE_URL);
 
+interface LoginData {
+  email: string;
+  password: string;
+}
+
+interface AuthResponse {
+  user: any;
+  accessToken: string;
+  refreshToken: string;
+  sessionId?: string;
+}
+
 export const authApi = {
-  patientLogin: async (data: any) => {
+  patientLogin: async (data: LoginData): Promise<AuthResponse> => {
     const response = await api.post('/auth/login/patient', data);
     if (response.accessToken) {
       api.setToken(response.accessToken);
@@ -105,7 +117,7 @@ export const authApi = {
     }
     return response;
   },
-  doctorLogin: async (data: any) => {
+  doctorLogin: async (data: LoginData): Promise<AuthResponse> => {
     const response = await api.post('/auth/login/doctor', data);
     if (response.accessToken) {
       api.setToken(response.accessToken);
@@ -117,7 +129,7 @@ export const authApi = {
     }
     return response;
   },
-  login: async (data: any) => {
+  login: async (data: LoginData): Promise<AuthResponse> => {
     const response = await api.post('/auth/login', data);
     if (response.accessToken) {
       api.setToken(response.accessToken);
@@ -129,7 +141,7 @@ export const authApi = {
     }
     return response;
   },
-  register: async (data: any) => {
+  register: async (data: any): Promise<AuthResponse> => {
     const response = await api.post('/auth/register', data);
     if (response.accessToken) {
       api.setToken(response.accessToken);

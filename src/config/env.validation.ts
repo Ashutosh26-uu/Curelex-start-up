@@ -13,11 +13,11 @@ class EnvironmentVariables {
 
   @IsString()
   @IsOptional()
-  JWT_EXPIRES_IN: string = '15m';
+  JWT_EXPIRES_IN: string = '24h';
 
   @IsString()
   @IsOptional()
-  JWT_REFRESH_EXPIRES_IN: string = '7d';
+  JWT_REFRESH_EXPIRES_IN: string = '30d';
 
   @IsNumber()
   @IsOptional()

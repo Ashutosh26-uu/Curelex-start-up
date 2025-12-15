@@ -1,0 +1,6 @@
+.backgroundImage {
+  background-image: url(/images/crelex.jpg);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 300px 300px;
+}
