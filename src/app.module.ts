@@ -49,7 +49,7 @@ const coreModules = [
   JwtModule.register({
     global: true,
     secret: process.env.JWT_SECRET || 'healthcare-secret',
-    signOptions: { expiresIn: '15m' },
+    signOptions: { expiresIn: '24h' },
   }),
   CacheModule.register({
     isGlobal: true,

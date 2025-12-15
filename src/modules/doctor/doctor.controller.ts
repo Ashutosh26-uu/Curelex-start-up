@@ -16,7 +16,7 @@ export class DoctorController {
 
   @ApiOperation({ summary: 'Get all doctors' })
   @Get()
-  @Roles(UserRole.ADMIN, UserRole.CEO, UserRole.CMO, UserRole.PATIENT)
+  @Roles(UserRole.PATIENT)
   findAll(
     @Query('page') page?: number,
     @Query('limit') limit?: number,
@@ -27,21 +27,21 @@ export class DoctorController {
 
   @ApiOperation({ summary: 'Get doctor profile' })
   @Get('me')
-  @Roles(UserRole.DOCTOR, UserRole.JUNIOR_DOCTOR)
+  @Roles(UserRole.DOCTOR)
   getMyProfile(@Request() req: any) {
     return this.doctorService.findByUserId(req.user.id);
   }
 
   @ApiOperation({ summary: 'Get doctor by ID' })
   @Get(':id')
-  @Roles(UserRole.ADMIN, UserRole.CEO, UserRole.CMO, UserRole.PATIENT)
+  @Roles(UserRole.PATIENT)
   findOne(@Param('id') id: string) {
     return this.doctorService.findOne(id);
   }
 
   @ApiOperation({ summary: 'Get assigned patients' })
   @Get(':id/patients')
-  @Roles(UserRole.DOCTOR, UserRole.JUNIOR_DOCTOR, UserRole.ADMIN)
+  @Roles(UserRole.DOCTOR)
   getAssignedPatients(
     @Param('id') id: string,
     @Query('page') page?: number,
@@ -62,7 +62,7 @@ export class DoctorController {
 
   @ApiOperation({ summary: 'Get visit history' })
   @Get(':id/visit-history')
-  @Roles(UserRole.DOCTOR, UserRole.JUNIOR_DOCTOR, UserRole.ADMIN)
+  @Roles(UserRole.DOCTOR)
   getVisitHistory(
     @Param('id') id: string,
     @Query('page') page?: number,
@@ -73,14 +73,14 @@ export class DoctorController {
 
   @ApiOperation({ summary: 'Get doctor statistics' })
   @Get(':id/stats')
-  @Roles(UserRole.DOCTOR, UserRole.JUNIOR_DOCTOR, UserRole.ADMIN, UserRole.CEO, UserRole.CMO)
+  @Roles(UserRole.DOCTOR)
   getDoctorStats(@Param('id') id: string) {
     return this.doctorService.getDoctorStats(id);
   }
 
   @ApiOperation({ summary: 'Update availability' })
   @Patch(':id/availability')
-  @Roles(UserRole.DOCTOR, UserRole.ADMIN)
+  @Roles(UserRole.DOCTOR)
   updateAvailability(
     @Param('id') id: string,
     @Body('isAvailable') isAvailable: boolean,

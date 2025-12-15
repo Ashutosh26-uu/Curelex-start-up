@@ -229,40 +229,7 @@ export const notificationApi = {
   markAsRead: (id: string) => api.patch(`/notifications/${id}/read`, {}),
 };
 
-export const adminApi = {
-  assignDoctor: (data: any) => api.post('/admin/assign-doctor', data),
-  unassignDoctor: (doctorId: string, patientId: string) => api.delete(`/admin/assign-doctor/${doctorId}/${patientId}`),
-  getUsers: (params?: any) => {
-    const query = params ? `?${new URLSearchParams(params)}` : '';
-    return api.get(`/admin/users${query}`);
-  },
-  toggleUserStatus: (id: string) => api.patch(`/admin/users/${id}/toggle-status`, {}),
-  deleteUser: (id: string) => api.delete(`/admin/users/${id}`),
-  getStats: () => api.get('/admin/stats'),
-  getActivity: (params?: any) => {
-    const query = params ? `?${new URLSearchParams(params)}` : '';
-    return api.get(`/admin/activity${query}`);
-  },
-  getAssignments: (params?: any) => {
-    const query = params ? `?${new URLSearchParams(params)}` : '';
-    return api.get(`/admin/assignments${query}`);
-  },
-};
 
-export const officerApi = {
-  getDashboard: () => api.get('/officer/dashboard'),
-  getStats: () => api.get('/officer/stats'),
-  getAppointmentAnalytics: (params?: any) => {
-    const query = params ? `?${new URLSearchParams(params)}` : '';
-    return api.get(`/officer/analytics/appointments${query}`);
-  },
-  getPatientAnalytics: () => api.get('/officer/analytics/patients'),
-  getRevenueAnalytics: (params?: any) => {
-    const query = params ? `?${new URLSearchParams(params)}` : '';
-    return api.get(`/officer/analytics/revenue${query}`);
-  },
-  getSystemHealth: () => api.get('/officer/system/health'),
-};
 
 export const prescriptionApi = {
   getMy: (params?: any) => {

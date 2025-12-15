@@ -8,49 +8,34 @@ import { authApi } from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { PasswordInput } from '@/components/ui/PasswordInput';
-import { Select } from '@/components/ui/Select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Stethoscope } from 'lucide-react';
 
-interface LoginForm {
+interface DoctorLoginForm {
   email: string;
   password: string;
-  role?: string;
 }
 
-export default function LoginPage() {
+export default function DoctorLoginPage() {
   const router = useRouter();
   const { setAuth } = useAuthStore();
   const [error, setError] = useState('');
 
-  const { register, handleSubmit, formState: { errors } } = useForm<LoginForm>();
+  const { register, handleSubmit, formState: { errors } } = useForm<DoctorLoginForm>();
 
   const loginMutation = useMutation({
-    mutationFn: authApi.login,
+    mutationFn: authApi.doctorLogin,
     onSuccess: (response) => {
       const { user, accessToken, refreshToken } = response;
       setAuth(user, accessToken, refreshToken);
-      
-      // Redirect based on user role - only patient and doctor
-      switch (user.role) {
-        case 'PATIENT':
-          router.push('/patient');
-          break;
-        case 'DOCTOR':
-        case 'JUNIOR_DOCTOR':
-          router.push('/doctor');
-          break;
-        default:
-          router.push('/home');
-      }
+      router.push('/doctor');
     },
     onError: (error: any) => {
       setError(error.message || 'Login failed');
     },
   });
 
-  const onSubmit = (data: LoginForm) => {
+  const onSubmit = (data: DoctorLoginForm) => {
     setError('');
     loginMutation.mutate(data);
   };
@@ -60,26 +45,19 @@ export default function LoginPage() {
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
           <div className="flex justify-center">
-            <Stethoscope className="h-12 w-12 text-primary-600" />
+            <Stethoscope className="h-12 w-12 text-green-600" />
           </div>
           <h2 className="mt-6 text-3xl font-extrabold text-gray-900">
-            Sign in to your account
+            Doctor Login
           </h2>
           <p className="mt-2 text-sm text-gray-600">
-            Healthcare Telemedicine Platform
+            Access your medical dashboard
           </p>
-          <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-            <p className="text-xs text-blue-800 font-medium mb-1">Login Credentials:</p>
-            <div className="text-xs text-blue-700 space-y-1">
-              <div><strong>Doctor:</strong> doctor@healthcare.com / doctor123</div>
-              <div><strong>Patient:</strong> patient@healthcare.com / patient123</div>
-            </div>
-          </div>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle>Login</CardTitle>
+            <CardTitle>Login to Doctor Portal</CardTitle>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
@@ -102,8 +80,9 @@ export default function LoginPage() {
                 error={errors.email?.message}
               />
 
-              <PasswordInput
+              <Input
                 label="Password"
+                type="password"
                 {...register('password', { 
                   required: 'Password is required',
                   minLength: {
@@ -114,41 +93,18 @@ export default function LoginPage() {
                 error={errors.password?.message}
               />
 
-
-
               <Button
                 type="submit"
-                className="w-full"
+                className="w-full bg-green-600 hover:bg-green-700"
                 loading={loginMutation.isPending}
               >
-                Sign in
+                Sign in as Doctor
               </Button>
 
-              <div className="text-center mt-4 space-y-3">
-                <p className="text-sm text-gray-600">
-                  New patient?{' '}
-                  <a href="/register?type=patient" className="text-primary-600 hover:text-primary-700 font-medium">
-                    Register here
-                  </a>
+              <div className="text-center mt-4 space-y-2">
+                <p className="text-xs text-gray-500">
+                  Patient? <a href="/patient-login" className="text-blue-600 hover:text-blue-700">Patient Portal</a>
                 </p>
-                
-                <div className="border-t pt-3">
-                  <p className="text-xs text-gray-500 mb-2">Or use specific portals:</p>
-                  <div className="grid grid-cols-2 gap-2">
-                    <a
-                      href="/patient-login"
-                      className="text-xs bg-blue-50 text-blue-600 py-2 px-3 rounded text-center hover:bg-blue-100"
-                    >
-                      Patient Portal
-                    </a>
-                    <a
-                      href="/staff-login"
-                      className="text-xs bg-green-50 text-green-600 py-2 px-3 rounded text-center hover:bg-green-100"
-                    >
-                      Doctor Portal
-                    </a>
-                  </div>
-                </div>
               </div>
             </form>
           </CardContent>

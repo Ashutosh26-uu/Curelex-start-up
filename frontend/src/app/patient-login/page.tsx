@@ -24,13 +24,9 @@ export default function PatientLoginPage() {
   const { register, handleSubmit, formState: { errors } } = useForm<PatientLoginForm>();
 
   const loginMutation = useMutation({
-    mutationFn: authApi.login,
+    mutationFn: authApi.patientLogin,
     onSuccess: (response) => {
       const { user, accessToken, refreshToken } = response;
-      if (user.role !== 'PATIENT') {
-        setError('This login is only for patients. Please use staff login.');
-        return;
-      }
       setAuth(user, accessToken, refreshToken);
       router.push('/patient');
     },

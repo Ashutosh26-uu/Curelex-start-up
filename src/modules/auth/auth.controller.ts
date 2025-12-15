@@ -15,7 +15,29 @@ import { Public } from '../../common/decorators/public.decorator';
 export class AuthController {
   constructor(private authService: AuthService) {}
 
-  @ApiOperation({ summary: 'User login' })
+  @ApiOperation({ summary: 'Patient Portal Login' })
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @Post('login/patient')
+  async patientLogin(@Body() loginDto: any, @Request() req: any) {
+    const ipAddress = req.ip || req.connection.remoteAddress;
+    const userAgent = req.get('User-Agent');
+    return this.authService.patientLogin(loginDto, ipAddress, userAgent);
+  }
+
+  @ApiOperation({ summary: 'Doctor Portal Login' })
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @Post('login/doctor')
+  async doctorLogin(@Body() loginDto: any, @Request() req: any) {
+    const ipAddress = req.ip || req.connection.remoteAddress;
+    const userAgent = req.get('User-Agent');
+    return this.authService.doctorLogin(loginDto, ipAddress, userAgent);
+  }
+
+
+
+  @ApiOperation({ summary: 'Legacy login endpoint' })
   @Public()
   @HttpCode(HttpStatus.OK)
   @Post('login')
@@ -133,6 +155,37 @@ export class AuthController {
     const ipAddress = req.ip || req.connection.remoteAddress;
     const userAgent = req.get('User-Agent');
     return this.authService.registerCxo(cxoRegisterDto, ipAddress, userAgent);
+  }
+
+  @ApiOperation({ summary: 'Auto refresh token if near expiry' })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @Post('auto-refresh')
+  async autoRefresh(@Request() req: any) {
+    const user = req.user;
+    const tokens = await this.authService.generateTokens(user.id, user.email, user.role, user.sessionId);
+    
+    return {
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+      user: {
+        id: user.id,
+        email: user.email,
+        role: user.role
+      }
+    };
+  }
+
+  @ApiOperation({ summary: 'Validate current session' })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @Get('validate-session')
+  async validateSession(@Request() req: any) {
+    return {
+      valid: true,
+      user: req.user,
+      timestamp: new Date()
+    };
   }
 
   @ApiOperation({ summary: 'Generate captcha' })

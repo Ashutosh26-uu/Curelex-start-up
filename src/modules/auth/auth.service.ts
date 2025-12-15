@@ -190,21 +190,44 @@ export class AuthService {
       
       const user = await this.prisma.user.findUnique({
         where: { id: payload.sub, isDeleted: false },
+        include: { profile: true, patient: true, doctor: true, officer: true },
       });
       
       if (!user || !user.refreshToken || !await bcrypt.compare(refreshToken, user.refreshToken)) {
         throw new UnauthorizedException('Invalid refresh token');
       }
       
-      const tokens = await this.generateTokens(user.id, user.email, user.role);
+      // Validate session if exists
+      if (user.sessionId) {
+        const sessionValid = await this.validateSession(user.sessionId);
+        if (!sessionValid) {
+          throw new UnauthorizedException('Session expired');
+        }
+      }
+      
+      const tokens = await this.generateTokens(user.id, user.email, user.role, user.sessionId);
       
       await this.prisma.user.update({
         where: { id: user.id },
-        data: { refreshToken: await bcrypt.hash(tokens.refreshToken, 10) },
+        data: { 
+          refreshToken: await bcrypt.hash(tokens.refreshToken, 10),
+          lastLoginAt: new Date()
+        },
       });
       
-      return tokens;
-    } catch {
+      return {
+        ...tokens,
+        user: {
+          id: user.id,
+          email: user.email,
+          role: user.role,
+          profile: user.profile,
+          patient: user.patient,
+          doctor: user.doctor,
+          officer: user.officer,
+        }
+      };
+    } catch (error) {
       throw new UnauthorizedException('Invalid refresh token');
     }
   }
@@ -376,8 +399,14 @@ export class AuthService {
   }
 
   private async createUserSession(userId: string, sessionId: string, ipAddress?: string, userAgent?: string) {
+    // First, deactivate any existing sessions for this user
+    await this.prisma.userSession.updateMany({
+      where: { userId, isActive: true },
+      data: { isActive: false }
+    });
+    
     const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 7);
+    expiresAt.setDate(expiresAt.getDate() + 30); // 30 days
     
     return this.prisma.userSession.create({
       data: {
@@ -460,4 +489,56 @@ export class AuthService {
       take: 50,
     });
   }
+
+  // Public method for token generation (used by auto-refresh)
+  async generateTokens(userId: string, email: string, role: string, sessionId?: string) {
+    const payload = { sub: userId, email, role, sessionId };
+    
+    const [accessToken, refreshToken] = await Promise.all([
+      this.jwtService.signAsync(payload, {
+        secret: this.configService.get('JWT_SECRET'),
+        expiresIn: this.configService.get('JWT_EXPIRES_IN') || '24h',
+      }),
+      this.jwtService.signAsync(payload, {
+        secret: this.configService.get('JWT_REFRESH_SECRET'),
+        expiresIn: this.configService.get('JWT_REFRESH_EXPIRES_IN') || '30d',
+      }),
+    ]);
+    
+    return { accessToken, refreshToken };
+  }
+
+  async generateCaptcha() {
+    const captcha = Math.random().toString(36).substring(2, 8).toUpperCase();
+    return {
+      captcha,
+      timestamp: new Date(),
+      expiresIn: '5 minutes'
+    };
+  }
+
+  // Portal-specific login methods
+  async patientLogin(loginDto: any, ipAddress?: string, userAgent?: string) {
+    const result = await this.login(loginDto, ipAddress, userAgent);
+    
+    // Validate user is patient
+    if (!['PATIENT'].includes(result.user.role)) {
+      throw new UnauthorizedException('Invalid portal access');
+    }
+    
+    return result;
+  }
+
+  async doctorLogin(loginDto: any, ipAddress?: string, userAgent?: string) {
+    const result = await this.login(loginDto, ipAddress, userAgent);
+    
+    // Validate user is doctor
+    if (result.user.role !== 'DOCTOR') {
+      throw new UnauthorizedException('Invalid portal access');
+    }
+    
+    return result;
+  }
+
+
 }

@@ -13,7 +13,23 @@ import { Public } from '../../common/decorators/public.decorator';
 export class PatientController {
   constructor(private patientService: PatientService) {}
 
-  @ApiOperation({ summary: 'Register new patient' })
+  @ApiOperation({ summary: 'Self registration by patient with phone-based unique ID' })
+  @Public()
+  @Post('self-register')
+  selfRegister(@Body() patientData: any) {
+    return this.patientService.selfRegisterPatient(patientData);
+  }
+
+  @ApiOperation({ summary: 'Assisted registration by junior doctor' })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Post('assisted-register')
+  @Roles(UserRole.DOCTOR)
+  assistedRegister(@Body() patientData: any, @Request() req: any) {
+    return this.patientService.assistedRegisterPatient(patientData, req.user.id);
+  }
+
+  @ApiOperation({ summary: 'Legacy registration endpoint' })
   @Public()
   @Post('register')
   register(@Body() patientData: any) {
@@ -24,7 +40,7 @@ export class PatientController {
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Get()
-  @Roles(UserRole.DOCTOR, UserRole.NURSE, UserRole.ADMIN, UserRole.CEO, UserRole.CMO)
+  @Roles(UserRole.DOCTOR)
   findAll(
     @Query('page') page?: number,
     @Query('limit') limit?: number,
@@ -42,11 +58,32 @@ export class PatientController {
     return this.patientService.findByUserId(req.user.id);
   }
 
+  @ApiOperation({ summary: 'Get patient by phone-based unique ID' })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Get('by-phone/:phoneId')
+  @Roles(UserRole.DOCTOR)
+  findByPhoneId(@Param('phoneId') phoneId: string) {
+    return this.patientService.findByPhoneId(phoneId);
+  }
+
+  @ApiOperation({ summary: 'Update medical details after registration' })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Post(':patientId/medical-details')
+  @Roles(UserRole.DOCTOR, UserRole.PATIENT)
+  updateMedicalDetails(
+    @Param('patientId') patientId: string,
+    @Body() medicalData: any
+  ) {
+    return this.patientService.updateMedicalDetails(patientId, medicalData);
+  }
+
   @ApiOperation({ summary: 'Get patient by ID' })
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Get(':id')
-  @Roles(UserRole.DOCTOR, UserRole.NURSE, UserRole.ADMIN, UserRole.CEO, UserRole.CMO)
+  @Roles(UserRole.DOCTOR)
   findOne(@Param('id') id: string) {
     return this.patientService.findOne(id);
   }
@@ -55,7 +92,7 @@ export class PatientController {
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Patch(':id')
-  @Roles(UserRole.PATIENT, UserRole.DOCTOR, UserRole.NURSE, UserRole.ADMIN)
+  @Roles(UserRole.PATIENT, UserRole.DOCTOR)
   update(@Param('id') id: string, @Body() updatePatientDto: UpdatePatientDto) {
     return this.patientService.update(id, updatePatientDto);
   }
@@ -64,7 +101,7 @@ export class PatientController {
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Get(':id/medical-history')
-  @Roles(UserRole.PATIENT, UserRole.DOCTOR, UserRole.NURSE, UserRole.ADMIN)
+  @Roles(UserRole.PATIENT, UserRole.DOCTOR)
   getMedicalHistory(@Param('id') id: string) {
     return this.patientService.getMedicalHistory(id);
   }
@@ -73,7 +110,7 @@ export class PatientController {
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Post(':id/medical-history')
-  @Roles(UserRole.DOCTOR, UserRole.ADMIN)
+  @Roles(UserRole.DOCTOR)
   addMedicalHistory(
     @Param('id') id: string,
     @Body() historyData: {
@@ -94,7 +131,7 @@ export class PatientController {
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Get(':id/past-visits')
-  @Roles(UserRole.PATIENT, UserRole.DOCTOR, UserRole.NURSE, UserRole.ADMIN)
+  @Roles(UserRole.PATIENT, UserRole.DOCTOR)
   getPastVisits(
     @Param('id') id: string,
     @Query('page') page?: number,
