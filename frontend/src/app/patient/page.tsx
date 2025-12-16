@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import { RoleGuard } from '@/components/guards/RoleGuard';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
@@ -10,18 +11,43 @@ import { useAuthStore } from '@/store/auth';
 import { Calendar, Activity, FileText, Clock } from 'lucide-react';
 
 export default function PatientDashboard() {
-  const { user } = useAuthStore();
+  const { user, updateLastActivity } = useAuthStore();
 
-  const { data: appointments } = useQuery({
+  // Update activity on component mount
+  useEffect(() => {
+    updateLastActivity();
+  }, [updateLastActivity]);
+
+  const { data: appointments, error: appointmentsError } = useQuery({
     queryKey: ['appointments', 'upcoming'],
     queryFn: () => appointmentApi.getUpcoming(),
+    retry: (failureCount, error: any) => {
+      // Don't retry on auth errors
+      if (error?.status === 401 || error?.status === 403) {
+        return false;
+      }
+      return failureCount < 3;
+    },
   });
 
-  const { data: vitals } = useQuery({
+  const { data: vitals, error: vitalsError } = useQuery({
     queryKey: ['vitals', 'latest', user?.patient?.id],
     queryFn: () => vitalsApi.getLatest(user?.patient?.id || ''),
     enabled: !!user?.patient?.id,
+    retry: (failureCount, error: any) => {
+      if (error?.status === 401 || error?.status === 403) {
+        return false;
+      }
+      return failureCount < 3;
+    },
   });
+
+  // Handle authentication errors
+  useEffect(() => {
+    if (appointmentsError?.status === 401 || vitalsError?.status === 401) {
+      window.location.href = '/login?reason=session_expired';
+    }
+  }, [appointmentsError, vitalsError]);
 
   return (
     <RoleGuard allowedRoles={[UserRole.PATIENT]}>
@@ -49,7 +75,12 @@ export default function PatientDashboard() {
                 <Activity className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{vitals?.data?.length || 0}</div>
+                <div className="text-2xl font-bold">
+                  {vitalsError ? 'Error' : (vitals?.data?.length || 0)}
+                </div>
+                {vitalsError && (
+                  <p className="text-xs text-red-500 mt-1">Failed to load vitals</p>
+                )}
               </CardContent>
             </Card>
 

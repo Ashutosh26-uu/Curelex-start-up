@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, UseGuards, Request, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, UseGuards, Request, Query, UnauthorizedException, ForbiddenException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { PatientService } from './patient.service';
 import { UpdatePatientDto } from './dto/update-patient.dto';
@@ -54,7 +54,11 @@ export class PatientController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Get('me')
   @Roles(UserRole.PATIENT)
-  getMyProfile(@Request() req: any) {
+  async getMyProfile(@Request() req: any) {
+    // Validate session and user access
+    if (!req.user?.patient?.id) {
+      throw new UnauthorizedException('Patient profile not found');
+    }
     return this.patientService.findByUserId(req.user.id);
   }
 
@@ -102,7 +106,22 @@ export class PatientController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Get(':id/medical-history')
   @Roles(UserRole.PATIENT, UserRole.DOCTOR)
-  getMedicalHistory(@Param('id') id: string) {
+  async getMedicalHistory(@Param('id') id: string, @Request() req: any) {
+    // Patients can only access their own medical history
+    if (req.user.role === UserRole.PATIENT) {
+      if (req.user.patient?.id !== id) {
+        throw new ForbiddenException('Access denied to medical history');
+      }
+    }
+    
+    // Doctors can only access assigned patients' history
+    if (req.user.role === UserRole.DOCTOR) {
+      const hasAccess = await this.patientService.verifyDoctorPatientAccess(req.user.doctor.id, id);
+      if (!hasAccess) {
+        throw new ForbiddenException('Access denied to patient medical history');
+      }
+    }
+    
     return this.patientService.getMedicalHistory(id);
   }
 
@@ -132,11 +151,24 @@ export class PatientController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Get(':id/past-visits')
   @Roles(UserRole.PATIENT, UserRole.DOCTOR)
-  getPastVisits(
+  async getPastVisits(
     @Param('id') id: string,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
+    @Request() req: any
   ) {
+    // Validate access permissions
+    if (req.user.role === UserRole.PATIENT && req.user.patient?.id !== id) {
+      throw new ForbiddenException('Access denied to visit history');
+    }
+    
+    if (req.user.role === UserRole.DOCTOR) {
+      const hasAccess = await this.patientService.verifyDoctorPatientAccess(req.user.doctor.id, id);
+      if (!hasAccess) {
+        throw new ForbiddenException('Access denied to patient visit history');
+      }
+    }
+    
     return this.patientService.getPastVisits(id, page, limit);
   }
 }

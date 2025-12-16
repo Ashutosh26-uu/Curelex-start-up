@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMutation } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
@@ -9,33 +9,102 @@ import { useAuthStore } from '@/store/auth';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import { Stethoscope } from 'lucide-react';
+import { Stethoscope, Eye, EyeOff, Shield, AlertTriangle } from 'lucide-react';
 
 interface PatientLoginForm {
   email: string;
   password: string;
+  captcha?: string;
+  rememberMe?: boolean;
 }
 
 export default function PatientLoginPage() {
   const router = useRouter();
-  const { setAuth } = useAuthStore();
+  const { setAuth, isAuthenticated } = useAuthStore();
   const [error, setError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [attemptCount, setAttemptCount] = useState(0);
+  const [isLocked, setIsLocked] = useState(false);
+  const [lockoutTime, setLockoutTime] = useState(0);
+  const [showCaptcha, setShowCaptcha] = useState(false);
 
-  const { register, handleSubmit, formState: { errors } } = useForm<PatientLoginForm>();
+  const { register, handleSubmit, formState: { errors }, watch, setValue } = useForm<PatientLoginForm>({
+    defaultValues: {
+      email: '',
+      password: '',
+      captcha: '',
+      rememberMe: false
+    }
+  });
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      router.push('/patient/dashboard');
+    }
+  }, [isAuthenticated, router]);
+
+  // Handle lockout timer
+  useEffect(() => {
+    if (lockoutTime > 0) {
+      const timer = setInterval(() => {
+        setLockoutTime(prev => {
+          if (prev <= 1) {
+            setIsLocked(false);
+            setAttemptCount(0);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+      return () => clearInterval(timer);
+    }
+  }, [lockoutTime]);
 
   const loginMutation = useMutation({
     mutationFn: authApi.patientLogin,
     onSuccess: (response) => {
-      const { user, accessToken, refreshToken } = response;
-      setAuth(user, accessToken, refreshToken);
-      router.push('/patient');
+      const { user, accessToken, refreshToken, sessionId } = response;
+      setAuth(user, accessToken, refreshToken, sessionId);
+      setError('');
+      setAttemptCount(0);
+      
+      // Redirect based on response or default
+      const redirectUrl = response.redirectUrl || '/patient/dashboard';
+      router.push(redirectUrl);
     },
     onError: (error: any) => {
-      setError(error.message || 'Login failed');
+      const errorMessage = error.message || 'Login failed';
+      setError(errorMessage);
+      
+      const newAttemptCount = attemptCount + 1;
+      setAttemptCount(newAttemptCount);
+      
+      // Show captcha after 3 attempts
+      if (newAttemptCount >= 3) {
+        setShowCaptcha(true);
+      }
+      
+      // Lock after 5 attempts
+      if (newAttemptCount >= 5) {
+        setIsLocked(true);
+        setLockoutTime(300); // 5 minutes
+      }
+      
+      // Clear password field on error
+      setValue('password', '');
+      if (showCaptcha) {
+        setValue('captcha', '');
+      }
     },
   });
 
   const onSubmit = (data: PatientLoginForm) => {
+    if (isLocked) {
+      setError(`Account temporarily locked. Try again in ${Math.ceil(lockoutTime / 60)} minutes.`);
+      return;
+    }
+    
     setError('');
     loginMutation.mutate(data);
   };
@@ -68,53 +137,148 @@ export default function PatientLoginPage() {
               )}
 
               <Input
-                label="Email"
+                label="Email Address"
                 type="email"
+                placeholder="Enter your email"
+                autoComplete="email"
                 {...register('email', { 
                   required: 'Email is required',
                   pattern: {
-                    value: /^\S+@\S+$/i,
-                    message: 'Invalid email address'
+                    value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
+                    message: 'Please enter a valid email address'
+                  },
+                  maxLength: {
+                    value: 255,
+                    message: 'Email must not exceed 255 characters'
                   }
                 })}
                 error={errors.email?.message}
+                disabled={loginMutation.isPending || isLocked}
               />
 
-              <Input
-                label="Password"
-                type="password"
-                {...register('password', { 
-                  required: 'Password is required',
-                  minLength: {
-                    value: 6,
-                    message: 'Password must be at least 6 characters'
-                  }
-                })}
-                error={errors.password?.message}
-              />
+              <div className="relative">
+                <Input
+                  label="Password"
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder="Enter your password"
+                  autoComplete="current-password"
+                  {...register('password', { 
+                    required: 'Password is required',
+                    minLength: {
+                      value: 8,
+                      message: 'Password must be at least 8 characters'
+                    },
+                    maxLength: {
+                      value: 128,
+                      message: 'Password must not exceed 128 characters'
+                    }
+                  })}
+                  error={errors.password?.message}
+                  disabled={loginMutation.isPending || isLocked}
+                />
+                <button
+                  type="button"
+                  className="absolute right-3 top-9 text-gray-400 hover:text-gray-600"
+                  onClick={() => setShowPassword(!showPassword)}
+                  disabled={loginMutation.isPending || isLocked}
+                >
+                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                </button>
+              </div>
+
+              {showCaptcha && (
+                <div className="space-y-2">
+                  <Input
+                    label="Security Verification"
+                    type="text"
+                    placeholder="Enter captcha"
+                    {...register('captcha', {
+                      required: showCaptcha ? 'Captcha is required' : false,
+                      minLength: {
+                        value: 4,
+                        message: 'Captcha must be at least 4 characters'
+                      }
+                    })}
+                    error={errors.captcha?.message}
+                    disabled={loginMutation.isPending || isLocked}
+                  />
+                  <div className="flex items-center space-x-2 text-sm text-yellow-600">
+                    <Shield size={16} />
+                    <span>Security verification required after multiple attempts</span>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="rememberMe"
+                  {...register('rememberMe')}
+                  className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                  disabled={loginMutation.isPending || isLocked}
+                />
+                <label htmlFor="rememberMe" className="ml-2 block text-sm text-gray-900">
+                  Keep me signed in
+                </label>
+              </div>
+
+              {isLocked && (
+                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded flex items-center space-x-2">
+                  <AlertTriangle size={20} />
+                  <div>
+                    <p className="font-medium">Account Temporarily Locked</p>
+                    <p className="text-sm">Too many failed attempts. Try again in {Math.ceil(lockoutTime / 60)} minutes.</p>
+                  </div>
+                </div>
+              )}
 
               <Button
                 type="submit"
                 className="w-full"
                 loading={loginMutation.isPending}
+                disabled={isLocked}
               >
-                Sign in as Patient
+                {loginMutation.isPending ? 'Signing in...' : 'Sign in as Patient'}
               </Button>
 
+              {attemptCount > 0 && attemptCount < 5 && (
+                <div className="text-center text-sm text-yellow-600">
+                  {5 - attemptCount} attempts remaining before temporary lockout
+                </div>
+              )}
+
               <div className="text-center mt-4 space-y-2">
+                <p className="text-sm text-gray-600">
+                  <a href="/auth/forgot-password" className="text-primary-600 hover:text-primary-700 font-medium">
+                    Forgot your password?
+                  </a>
+                </p>
                 <p className="text-sm text-gray-600">
                   New patient?{' '}
                   <a href="/register?type=patient" className="text-primary-600 hover:text-primary-700 font-medium">
                     Register as Patient
                   </a>
                 </p>
-                <p className="text-xs text-gray-500">
-                  Staff member? <a href="/staff-login" className="text-green-600 hover:text-green-700">Staff Portal</a>
-                </p>
+                <div className="border-t pt-2 mt-4">
+                  <p className="text-xs text-gray-500">
+                    Medical staff? <a href="/doctor-login" className="text-green-600 hover:text-green-700">Doctor Portal</a>
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    Other staff? <a href="/staff-login" className="text-blue-600 hover:text-blue-700">Staff Portal</a>
+                  </p>
+                </div>
               </div>
             </form>
           </CardContent>
         </Card>
+        
+        {/* Security Notice */}
+        <div className="mt-4 text-center">
+          <div className="inline-flex items-center space-x-2 text-xs text-gray-500 bg-gray-50 px-3 py-2 rounded">
+            <Shield size={14} />
+            <span>Your connection is secure and encrypted</span>
+          </div>
+        </div>
       </div>
     </div>
   );

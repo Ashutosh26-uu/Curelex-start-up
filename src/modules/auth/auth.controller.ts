@@ -1,7 +1,8 @@
-import { Controller, Post, Body, UseGuards, Request, HttpCode, HttpStatus, Get } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { Controller, Post, Body, UseGuards, Request, HttpCode, HttpStatus, Get, UseInterceptors, UsePipes, ValidationPipe, Res, Headers } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse, ApiRateLimitResponse } from '@nestjs/swagger';
+import { Response } from 'express';
 import { AuthService } from './auth.service';
-import { LoginDto } from './dto/login.dto';
+import { LoginDto, PatientLoginDto, DoctorLoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
@@ -9,6 +10,7 @@ import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { Public } from '../../common/decorators/public.decorator';
+import { LoggingInterceptor } from '../../common/interceptors/logging.interceptor';
 
 @ApiTags('Authentication')
 @Controller('auth')
@@ -16,35 +18,88 @@ export class AuthController {
   constructor(private authService: AuthService) {}
 
   @ApiOperation({ summary: 'Patient Portal Login' })
+  @ApiResponse({ status: 200, description: 'Login successful' })
+  @ApiResponse({ status: 401, description: 'Invalid credentials' })
+  @ApiResponse({ status: 429, description: 'Too many requests' })
   @Public()
+  @UseInterceptors(LoggingInterceptor)
+  @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
   @HttpCode(HttpStatus.OK)
   @Post('login/patient')
-  async patientLogin(@Body() loginDto: any, @Request() req: any) {
-    const ipAddress = req.ip || req.connection.remoteAddress;
+  async patientLogin(
+    @Body() loginDto: PatientLoginDto, 
+    @Request() req: any,
+    @Res({ passthrough: true }) res: Response,
+    @Headers('x-forwarded-for') forwardedFor?: string
+  ) {
+    const ipAddress = forwardedFor || req.ip || req.connection.remoteAddress;
     const userAgent = req.get('User-Agent');
-    return this.authService.patientLogin(loginDto, ipAddress, userAgent);
+    
+    const result = await this.authService.patientLogin(loginDto, ipAddress, userAgent);
+    
+    // Set security headers
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('X-XSS-Protection', '1; mode=block');
+    
+    return result;
   }
 
   @ApiOperation({ summary: 'Doctor Portal Login' })
+  @ApiResponse({ status: 200, description: 'Login successful' })
+  @ApiResponse({ status: 401, description: 'Invalid credentials' })
+  @ApiResponse({ status: 429, description: 'Too many requests' })
   @Public()
+  @UseInterceptors(LoggingInterceptor)
+  @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
   @HttpCode(HttpStatus.OK)
   @Post('login/doctor')
-  async doctorLogin(@Body() loginDto: any, @Request() req: any) {
-    const ipAddress = req.ip || req.connection.remoteAddress;
+  async doctorLogin(
+    @Body() loginDto: DoctorLoginDto, 
+    @Request() req: any,
+    @Res({ passthrough: true }) res: Response,
+    @Headers('x-forwarded-for') forwardedFor?: string
+  ) {
+    const ipAddress = forwardedFor || req.ip || req.connection.remoteAddress;
     const userAgent = req.get('User-Agent');
-    return this.authService.doctorLogin(loginDto, ipAddress, userAgent);
+    
+    const result = await this.authService.doctorLogin(loginDto, ipAddress, userAgent);
+    
+    // Set security headers
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('X-XSS-Protection', '1; mode=block');
+    
+    return result;
   }
 
 
 
-  @ApiOperation({ summary: 'Legacy login endpoint' })
+  @ApiOperation({ summary: 'General login endpoint' })
+  @ApiResponse({ status: 200, description: 'Login successful' })
+  @ApiResponse({ status: 401, description: 'Invalid credentials' })
   @Public()
+  @UseInterceptors(LoggingInterceptor)
+  @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
   @HttpCode(HttpStatus.OK)
   @Post('login')
-  async login(@Body() loginDto: LoginDto, @Request() req: any) {
-    const ipAddress = req.ip || req.connection.remoteAddress;
+  async login(
+    @Body() loginDto: LoginDto, 
+    @Request() req: any,
+    @Res({ passthrough: true }) res: Response,
+    @Headers('x-forwarded-for') forwardedFor?: string
+  ) {
+    const ipAddress = forwardedFor || req.ip || req.connection.remoteAddress;
     const userAgent = req.get('User-Agent');
-    return this.authService.login(loginDto, ipAddress, userAgent);
+    
+    const result = await this.authService.login(loginDto, ipAddress, userAgent);
+    
+    // Set security headers
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('X-XSS-Protection', '1; mode=block');
+    
+    return result;
   }
 
   @ApiOperation({ summary: 'User registration' })
@@ -63,13 +118,24 @@ export class AuthController {
   }
 
   @ApiOperation({ summary: 'User logout' })
+  @ApiResponse({ status: 200, description: 'Logout successful' })
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
+  @UseInterceptors(LoggingInterceptor)
   @HttpCode(HttpStatus.OK)
   @Post('logout')
-  async logout(@Request() req: any) {
+  async logout(
+    @Request() req: any,
+    @Res({ passthrough: true }) res: Response
+  ) {
     const sessionId = req.user.sessionId;
-    return this.authService.logout(req.user.id, sessionId);
+    const result = await this.authService.logout(req.user.id, sessionId);
+    
+    // Clear any client-side cookies if they exist
+    res.clearCookie('access_token');
+    res.clearCookie('refresh_token');
+    
+    return result;
   }
 
   @ApiOperation({ summary: 'Logout from all sessions' })

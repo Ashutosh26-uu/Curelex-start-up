@@ -23,7 +23,10 @@ export class AuthService {
   ) {}
 
   async login(loginDto: LoginDto, ipAddress?: string, userAgent?: string) {
-    const { email, password } = loginDto;
+    const { email, password, captcha } = loginDto;
+    
+    // Rate limiting check
+    await this.checkRateLimit(email, ipAddress);
     
     // Log login attempt
     await this.logLoginAttempt(email, ipAddress, userAgent, false);
@@ -33,36 +36,44 @@ export class AuthService {
       include: { profile: true, patient: true, doctor: true, officer: true },
     });
 
-    // Check if user exists
-    if (!user) {
-      await this.logLoginAttempt(email, ipAddress, userAgent, false, 'User not found');
-      throw new UnauthorizedException('Invalid credentials');
+    // Always use constant time comparison to prevent timing attacks
+    const dummyHash = '$2b$10$dummyhashtopreventtimingattacks';
+    const userExists = !!user;
+    const passwordToCheck = user?.password || dummyHash;
+    
+    // Verify password (always runs to prevent timing attacks)
+    const isPasswordValid = await PasswordUtil.compare(password, passwordToCheck);
+    
+    // Check if user exists and password is valid
+    if (!userExists || !isPasswordValid) {
+      if (user) {
+        await this.incrementFailedAttempts(user.id);
+      }
+      await this.logLoginAttempt(email, ipAddress, userAgent, false, 'Invalid credentials');
+      throw new UnauthorizedException('Invalid email or password');
     }
 
     // Check if account is locked
     if (user.isLocked) {
       await this.logLoginAttempt(email, ipAddress, userAgent, false, 'Account locked');
-      throw new UnauthorizedException(`Account is locked: ${user.lockReason || 'Security violation'}`);
+      throw new UnauthorizedException('Account is temporarily locked. Please contact support.');
     }
 
     // Check failed login attempts (lock after 5 attempts)
     if (user.failedLoginAttempts >= 5) {
       await this.lockUser(user.id, 'Too many failed login attempts');
-      throw new UnauthorizedException('Account locked due to multiple failed login attempts');
-    }
-
-    // Verify password
-    const isPasswordValid = await PasswordUtil.compare(password, user.password);
-    if (!isPasswordValid) {
-      await this.incrementFailedAttempts(user.id);
-      await this.logLoginAttempt(email, ipAddress, userAgent, false, 'Invalid password');
-      throw new UnauthorizedException('Invalid credentials');
+      throw new UnauthorizedException('Account locked due to multiple failed login attempts. Please reset your password.');
     }
 
     // Check if account is active
     if (!user.isActive) {
       await this.logLoginAttempt(email, ipAddress, userAgent, false, 'Account deactivated');
-      throw new UnauthorizedException('Account is deactivated');
+      throw new UnauthorizedException('Account is deactivated. Please contact support.');
+    }
+
+    // Validate captcha if required (after 3 failed attempts)
+    if (user.failedLoginAttempts >= 3 && !captcha) {
+      throw new UnauthorizedException('Captcha verification required');
     }
 
     // Generate session and tokens
@@ -76,7 +87,7 @@ export class AuthService {
     await this.prisma.user.update({
       where: { id: user.id },
       data: { 
-        refreshToken: await bcrypt.hash(tokens.refreshToken, 10),
+        refreshToken: await bcrypt.hash(tokens.refreshToken, 12),
         lastLoginAt: new Date(),
         failedLoginAttempts: 0,
         lastFailedLoginAt: null,
@@ -91,6 +102,8 @@ export class AuthService {
     await this.logLoginAttempt(email, ipAddress, userAgent, true);
 
     return {
+      success: true,
+      message: 'Login successful',
       user: {
         id: user.id,
         email: user.email,
@@ -105,6 +118,7 @@ export class AuthService {
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken,
       sessionId,
+      expiresIn: this.configService.get('JWT_EXPIRES_IN') || '24h',
     };
   }
 
@@ -484,16 +498,24 @@ export class AuthService {
   }
 
   async generateTokens(userId: string, email: string, role: string, sessionId?: string) {
-    const payload = { sub: userId, email, role, sessionId };
+    const now = Math.floor(Date.now() / 1000);
+    const payload = { 
+      sub: userId, 
+      email, 
+      role, 
+      sessionId,
+      iat: now,
+      jti: require('crypto').randomUUID() // JWT ID for token tracking
+    };
     
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(payload, {
         secret: this.configService.get('JWT_SECRET'),
-        expiresIn: this.configService.get('JWT_EXPIRES_IN') || '24h',
+        expiresIn: this.configService.get('JWT_EXPIRES_IN') || '15m', // Shorter access token lifetime
       }),
-      this.jwtService.signAsync(payload, {
+      this.jwtService.signAsync({ ...payload, type: 'refresh' }, {
         secret: this.configService.get('JWT_REFRESH_SECRET'),
-        expiresIn: this.configService.get('JWT_REFRESH_EXPIRES_IN') || '30d',
+        expiresIn: this.configService.get('JWT_REFRESH_EXPIRES_IN') || '7d', // Shorter refresh token lifetime
       }),
     ]);
     
@@ -521,27 +543,79 @@ export class AuthService {
     };
   }
 
-  // Portal-specific login methods
+  // Portal-specific login methods with role validation
   async patientLogin(loginDto: any, ipAddress?: string, userAgent?: string) {
-    const result = await this.login(loginDto, ipAddress, userAgent);
-    
-    // Validate user is patient
-    if (!['PATIENT'].includes(result.user.role)) {
-      throw new UnauthorizedException('Invalid portal access');
+    try {
+      const result = await this.login(loginDto, ipAddress, userAgent);
+      
+      // Validate user is patient
+      if (!['PATIENT'].includes(result.user.role)) {
+        await this.logLoginAttempt(loginDto.email, ipAddress, userAgent, false, 'Invalid portal access - not a patient');
+        throw new UnauthorizedException('Access denied. This portal is for patients only.');
+      }
+      
+      return {
+        ...result,
+        portalType: 'PATIENT',
+        redirectUrl: '/patient/dashboard'
+      };
+    } catch (error) {
+      throw error;
     }
-    
-    return result;
   }
 
   async doctorLogin(loginDto: any, ipAddress?: string, userAgent?: string) {
-    const result = await this.login(loginDto, ipAddress, userAgent);
+    try {
+      const result = await this.login(loginDto, ipAddress, userAgent);
+      
+      // Validate user is doctor or junior doctor
+      if (!['DOCTOR', 'JUNIOR_DOCTOR'].includes(result.user.role)) {
+        await this.logLoginAttempt(loginDto.email, ipAddress, userAgent, false, 'Invalid portal access - not a doctor');
+        throw new UnauthorizedException('Access denied. This portal is for medical professionals only.');
+      }
+      
+      return {
+        ...result,
+        portalType: 'DOCTOR',
+        redirectUrl: result.user.role === 'DOCTOR' ? '/doctor/dashboard' : '/junior-doctor/dashboard'
+      };
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // Rate limiting implementation
+  private async checkRateLimit(email: string, ipAddress?: string) {
+    const now = new Date();
+    const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000);
     
-    // Validate user is doctor or junior doctor
-    if (!['DOCTOR', 'JUNIOR_DOCTOR'].includes(result.user.role)) {
-      throw new UnauthorizedException('Invalid portal access');
+    // Check attempts by email
+    const emailAttempts = await this.prisma.loginHistory.count({
+      where: {
+        email,
+        createdAt: { gte: fiveMinutesAgo },
+        success: false,
+      },
+    });
+    
+    if (emailAttempts >= 10) {
+      throw new UnauthorizedException('Too many login attempts. Please try again in 5 minutes.');
     }
     
-    return result;
+    // Check attempts by IP
+    if (ipAddress) {
+      const ipAttempts = await this.prisma.loginHistory.count({
+        where: {
+          ipAddress,
+          createdAt: { gte: fiveMinutesAgo },
+          success: false,
+        },
+      });
+      
+      if (ipAttempts >= 20) {
+        throw new UnauthorizedException('Too many login attempts from this IP. Please try again later.');
+      }
+    }
   }
 
 

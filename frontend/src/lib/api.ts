@@ -35,12 +35,17 @@ class ApiClient {
   private async request(endpoint: string, options: RequestInit = {}) {
     const url = `${this.baseURL}${endpoint}`;
     
+    // Add security headers
     const config: RequestInit = {
       headers: {
         'Content-Type': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache',
         ...(this.token && { Authorization: `Bearer ${this.token}` }),
         ...options.headers,
       },
+      credentials: 'same-origin',
       ...options,
     };
 
@@ -49,20 +54,85 @@ class ApiClient {
       
       if (!response.ok) {
         if (response.status === 401) {
+          // Try to refresh token first
+          const refreshAttempted = await this.attemptTokenRefresh();
+          if (refreshAttempted) {
+            // Retry the original request with new token
+            const retryConfig = {
+              ...config,
+              headers: {
+                ...config.headers,
+                Authorization: `Bearer ${this.token}`,
+              },
+            };
+            const retryResponse = await fetch(url, retryConfig);
+            if (retryResponse.ok) {
+              return retryResponse.json();
+            }
+          }
+          
+          // If refresh failed or retry failed, logout
           this.clearToken();
           if (typeof window !== 'undefined') {
-            window.location.href = '/login';
+            window.location.href = '/login?reason=session_expired';
           }
         }
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+        
+        let errorData: any = {};
+        try {
+          errorData = await response.json();
+        } catch {
+          errorData = { message: `HTTP ${response.status}: ${response.statusText}` };
+        }
+        
+        const error = new Error(errorData.message || `Request failed with status ${response.status}`);
+        (error as any).status = response.status;
+        (error as any).data = errorData;
+        throw error;
+      }
+      
+      // Update last activity on successful request
+      if (typeof window !== 'undefined' && this.token) {
+        localStorage.setItem('last_activity', Date.now().toString());
       }
       
       return response.json();
     } catch (error) {
-      console.error('API Request failed:', error);
+      console.error('API Request failed:', {
+        url,
+        method: options.method || 'GET',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
       throw error;
     }
+  }
+
+  private async attemptTokenRefresh(): Promise<boolean> {
+    if (typeof window === 'undefined') return false;
+    
+    const refreshToken = localStorage.getItem('refresh_token');
+    if (!refreshToken) return false;
+    
+    try {
+      const response = await fetch(`${this.baseURL}/auth/refresh`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ refreshToken }),
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        this.setToken(data.accessToken);
+        localStorage.setItem('refresh_token', data.refreshToken);
+        return true;
+      }
+    } catch (error) {
+      console.error('Token refresh failed:', error);
+    }
+    
+    return false;
   }
 
   get(endpoint: string) {
@@ -105,29 +175,46 @@ interface AuthResponse {
 }
 
 export const authApi = {
+  validateSession: () => api.get('/auth/validate-session'),
   patientLogin: async (data: LoginData): Promise<AuthResponse> => {
-    const response = await api.post('/auth/login/patient', data);
-    if (response.accessToken) {
-      api.setToken(response.accessToken);
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('refresh_token', response.refreshToken);
-        localStorage.setItem('session_id', response.sessionId || '');
-        localStorage.setItem('user', JSON.stringify(response.user));
+    try {
+      const response = await api.post('/auth/login/patient', data);
+      if (response.success && response.accessToken) {
+        api.setToken(response.accessToken);
+        if (typeof window !== 'undefined') {
+          const expiresAt = Date.now() + (15 * 60 * 1000); // 15 minutes
+          localStorage.setItem('refresh_token', response.refreshToken);
+          localStorage.setItem('session_id', response.sessionId || '');
+          localStorage.setItem('user', JSON.stringify(response.user));
+          localStorage.setItem('token_expires_at', expiresAt.toString());
+          localStorage.setItem('last_activity', Date.now().toString());
+        }
       }
+      return response;
+    } catch (error) {
+      console.error('Patient login failed:', error);
+      throw error;
     }
-    return response;
   },
   doctorLogin: async (data: LoginData): Promise<AuthResponse> => {
-    const response = await api.post('/auth/login/doctor', data);
-    if (response.accessToken) {
-      api.setToken(response.accessToken);
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('refresh_token', response.refreshToken);
-        localStorage.setItem('session_id', response.sessionId || '');
-        localStorage.setItem('user', JSON.stringify(response.user));
+    try {
+      const response = await api.post('/auth/login/doctor', data);
+      if (response.success && response.accessToken) {
+        api.setToken(response.accessToken);
+        if (typeof window !== 'undefined') {
+          const expiresAt = Date.now() + (15 * 60 * 1000); // 15 minutes
+          localStorage.setItem('refresh_token', response.refreshToken);
+          localStorage.setItem('session_id', response.sessionId || '');
+          localStorage.setItem('user', JSON.stringify(response.user));
+          localStorage.setItem('token_expires_at', expiresAt.toString());
+          localStorage.setItem('last_activity', Date.now().toString());
+        }
       }
+      return response;
+    } catch (error) {
+      console.error('Doctor login failed:', error);
+      throw error;
     }
-    return response;
   },
   login: async (data: LoginData): Promise<AuthResponse> => {
     const response = await api.post('/auth/login', data);
@@ -155,6 +242,9 @@ export const authApi = {
   logout: async () => {
     try {
       await api.post('/auth/logout', {});
+    } catch (error) {
+      console.error('Logout request failed:', error);
+      // Continue with local cleanup even if server request fails
     } finally {
       api.clearToken();
     }
@@ -162,6 +252,9 @@ export const authApi = {
   logoutAll: async () => {
     try {
       await api.post('/auth/logout-all', {});
+    } catch (error) {
+      console.error('Logout all request failed:', error);
+      // Continue with local cleanup even if server request fails
     } finally {
       api.clearToken();
     }
@@ -171,13 +264,26 @@ export const authApi = {
   getProfile: () => api.get('/auth/me'),
   refreshToken: async () => {
     const refreshToken = typeof window !== 'undefined' ? localStorage.getItem('refresh_token') : null;
-    if (!refreshToken) throw new Error('No refresh token');
+    if (!refreshToken) throw new Error('No refresh token available');
     
-    const response = await api.post('/auth/refresh', { refreshToken });
-    if (response.accessToken) {
-      api.setToken(response.accessToken);
+    try {
+      const response = await api.post('/auth/refresh', { refreshToken });
+      if (response.accessToken) {
+        api.setToken(response.accessToken);
+        if (typeof window !== 'undefined') {
+          const expiresAt = Date.now() + (15 * 60 * 1000); // 15 minutes
+          localStorage.setItem('refresh_token', response.refreshToken);
+          localStorage.setItem('token_expires_at', expiresAt.toString());
+          localStorage.setItem('last_activity', Date.now().toString());
+        }
+      }
+      return response;
+    } catch (error) {
+      console.error('Token refresh failed:', error);
+      // Clear tokens on refresh failure
+      api.clearToken();
+      throw error;
     }
-    return response;
   },
   changePassword: (data: { currentPassword: string; newPassword: string }) => 
     api.post('/auth/change-password', data),
@@ -285,3 +391,38 @@ export const healthApi = {
   check: () => api.get('/health'),
   status: () => api.get('/status'),
 };
+
+// Security utilities
+export const securityApi = {
+  validateSession: () => api.get('/auth/validate-session'),
+  getActiveSessions: () => api.get('/auth/sessions'),
+  terminateSession: (sessionId: string) => api.delete(`/auth/sessions/${sessionId}`),
+  changePassword: (data: { currentPassword: string; newPassword: string }) => 
+    api.post('/auth/change-password', data),
+  enable2FA: () => api.post('/auth/2fa/enable', {}),
+  disable2FA: (code: string) => api.post('/auth/2fa/disable', { code }),
+};
+
+// Add validateSession to authApi
+authApi.validateSession = securityApi.validateSession;
+
+// Initialize token refresh interval
+if (typeof window !== 'undefined') {
+  setInterval(() => {
+    const token = localStorage.getItem('access_token');
+    const expiresAtStr = localStorage.getItem('token_expires_at');
+    
+    if (token && expiresAtStr) {
+      const expiresAt = parseInt(expiresAtStr);
+      const now = Date.now();
+      const timeUntilExpiry = expiresAt - now;
+      
+      // Refresh token if it expires in less than 5 minutes
+      if (timeUntilExpiry < 5 * 60 * 1000 && timeUntilExpiry > 0) {
+        authApi.refreshToken().catch(error => {
+          console.error('Auto token refresh failed:', error);
+        });
+      }
+    }
+  }, 60 * 1000); // Check every minute
+}

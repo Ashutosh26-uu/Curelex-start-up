@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import { RoleGuard } from '@/components/guards/RoleGuard';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
@@ -7,14 +8,33 @@ import { Button } from '@/components/ui/Button';
 import { UserRole } from '@/types';
 import { useQuery } from '@tanstack/react-query';
 import { appointmentApi } from '@/lib/api';
+import { useAuthStore } from '@/store/auth';
 import { formatDate } from '@/lib/utils';
-import { Calendar, Video, Clock } from 'lucide-react';
+import { Calendar, Video, Clock, AlertCircle } from 'lucide-react';
 
 export default function PatientAppointments() {
-  const { data: appointments } = useQuery({
+  const { updateLastActivity } = useAuthStore();
+
+  useEffect(() => {
+    updateLastActivity();
+  }, [updateLastActivity]);
+
+  const { data: appointments, error, isLoading } = useQuery({
     queryKey: ['appointments', 'upcoming'],
     queryFn: () => appointmentApi.getUpcoming(),
+    retry: (failureCount, error: any) => {
+      if (error?.status === 401 || error?.status === 403) {
+        return false;
+      }
+      return failureCount < 3;
+    },
   });
+
+  useEffect(() => {
+    if (error?.status === 401) {
+      window.location.href = '/login?reason=session_expired';
+    }
+  }, [error]);
 
   return (
     <RoleGuard allowedRoles={[UserRole.PATIENT]}>
@@ -31,8 +51,26 @@ export default function PatientAppointments() {
             </Button>
           </div>
 
+          {error && (
+            <Card className="border-red-200 bg-red-50">
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-2 text-red-700">
+                  <AlertCircle className="h-5 w-5" />
+                  <span>Failed to load appointments. Please try again.</span>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           <div className="grid gap-4">
-            {appointments?.data?.map((appointment: any) => (
+            {isLoading ? (
+              <Card>
+                <CardContent className="p-6 text-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                  <p className="text-gray-600">Loading appointments...</p>
+                </CardContent>
+              </Card>
+            ) : appointments?.data?.map((appointment: any) => (
               <Card key={appointment.id}>
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
