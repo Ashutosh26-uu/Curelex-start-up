@@ -1,14 +1,18 @@
-import { Injectable, NestInterceptor, ExecutionContext, CallHandler } from '@nestjs/common';
+import { Injectable, NestInterceptor, ExecutionContext, CallHandler, Logger } from '@nestjs/common';
 import { Observable } from 'rxjs';
-import { tap } from 'rxjs/operators';
+import { tap, catchError } from 'rxjs/operators';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import { throwError } from 'rxjs';
 
 @Injectable()
 export class TokenRefreshInterceptor implements NestInterceptor {
+  private readonly logger = new Logger(TokenRefreshInterceptor.name);
+  private readonly REFRESH_THRESHOLD_SECONDS = 900; // 15 minutes
+
   constructor(
-    private jwtService: JwtService,
-    private configService: ConfigService
+    private readonly jwtService: JwtService,
+    private readonly configService: ConfigService
   ) {}
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
@@ -17,27 +21,50 @@ export class TokenRefreshInterceptor implements NestInterceptor {
 
     return next.handle().pipe(
       tap(() => {
-        const token = this.extractTokenFromHeader(request);
-        if (token) {
-          try {
-            const payload = this.jwtService.decode(token) as any;
-            const currentTime = Math.floor(Date.now() / 1000);
-            const tokenExp = payload.exp;
-            
-            // If token expires within 1 hour, add refresh header
-            if (tokenExp - currentTime < 3600) {
-              response.setHeader('X-Token-Refresh-Required', 'true');
-            }
-          } catch (error) {
-            // Token decode failed, ignore
-          }
+        try {
+          this.checkTokenRefreshRequirement(request, response);
+        } catch (error) {
+          this.logger.warn('Token refresh check failed', error.message);
         }
+      }),
+      catchError((error) => {
+        this.logger.error('Request processing failed', error.message);
+        return throwError(() => error);
       })
     );
   }
 
+  private checkTokenRefreshRequirement(request: any, response: any): void {
+    const token = this.extractTokenFromHeader(request);
+    if (!token) {
+      return;
+    }
+
+    try {
+      const payload = this.jwtService.decode(token) as any;
+      if (!payload?.exp) {
+        return;
+      }
+
+      const currentTime = Math.floor(Date.now() / 1000);
+      const timeUntilExpiry = payload.exp - currentTime;
+      
+      if (timeUntilExpiry > 0 && timeUntilExpiry < this.REFRESH_THRESHOLD_SECONDS) {
+        response.setHeader('X-Token-Refresh-Required', 'true');
+        response.setHeader('X-Token-Expires-In', timeUntilExpiry.toString());
+      }
+    } catch (error) {
+      this.logger.debug('Token decode failed during refresh check', error.message);
+    }
+  }
+
   private extractTokenFromHeader(request: any): string | undefined {
-    const [type, token] = request.headers.authorization?.split(' ') ?? [];
-    return type === 'Bearer' ? token : undefined;
+    const authHeader = request.headers?.authorization;
+    if (!authHeader || typeof authHeader !== 'string') {
+      return undefined;
+    }
+
+    const [type, token] = authHeader.split(' ');
+    return type === 'Bearer' && token ? token : undefined;
   }
 }

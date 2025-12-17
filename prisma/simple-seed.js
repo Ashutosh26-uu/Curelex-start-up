@@ -1,14 +1,21 @@
 const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcryptjs');
+require('dotenv').config();
 
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log('🌱 Starting database seed...');
+  try {
+    console.log('🌱 Starting database seed...');
 
-  const hashedPassword = await bcrypt.hash('admin@123', 12);
-  const doctorPassword = await bcrypt.hash('doctor123', 12);
-  const patientPassword = await bcrypt.hash('patient123', 12);
+    // Use environment variables for passwords or generate secure defaults
+    const defaultPassword = process.env.SEED_DEFAULT_PASSWORD || 'TempPass123!';
+    const doctorPassword = process.env.SEED_DOCTOR_PASSWORD || 'DocPass123!';
+    const patientPassword = process.env.SEED_PATIENT_PASSWORD || 'PatPass123!';
+    
+    const hashedPassword = await bcrypt.hash(defaultPassword, 12);
+    const hashedDoctorPassword = await bcrypt.hash(doctorPassword, 12);
+    const hashedPatientPassword = await bcrypt.hash(patientPassword, 12);
 
   // Create Admin User
   const adminUser = await prisma.user.upsert({
@@ -36,7 +43,7 @@ async function main() {
     update: {},
     create: {
       email: 'doctor@healthcare.com',
-      password: doctorPassword,
+      password: hashedDoctorPassword,
       role: 'DOCTOR',
       isActive: true,
       profile: {
@@ -66,7 +73,7 @@ async function main() {
     update: {},
     create: {
       email: 'patient@healthcare.com',
-      password: patientPassword,
+      password: hashedPatientPassword,
       role: 'PATIENT',
       isActive: true,
       profile: {
@@ -137,13 +144,17 @@ async function main() {
     },
   });
 
-  console.log('✅ Database seeded successfully!');
-  console.log('\n📋 Login Credentials:');
-  console.log('👨💼 Admin: ashutosh@curelex.com / admin@123');
-  console.log('👨⚕️ Doctor: doctor@healthcare.com / doctor123');
-  console.log('👤 Patient: patient@healthcare.com / patient123');
-  console.log('👩⚕️ Nurse: nurse@healthcare.com / admin@123');
-  console.log('👨💼 CEO: ceo@healthcare.com / admin@123');
+    console.log('✅ Database seeded successfully!');
+    console.log('\n📋 Login Credentials:');
+    console.log('👨💼 Admin: ashutosh@curelex.com / [Check SEED_DEFAULT_PASSWORD env var]');
+    console.log('👨⚕️ Doctor: doctor@healthcare.com / [Check SEED_DOCTOR_PASSWORD env var]');
+    console.log('👤 Patient: patient@healthcare.com / [Check SEED_PATIENT_PASSWORD env var]');
+    console.log('👩⚕️ Nurse: nurse@healthcare.com / [Check SEED_DEFAULT_PASSWORD env var]');
+    console.log('👨💼 CEO: ceo@healthcare.com / [Check SEED_DEFAULT_PASSWORD env var]');
+  } catch (error) {
+    console.error('❌ Seed operation failed:', error.message);
+    throw error;
+  }
 }
 
 main()

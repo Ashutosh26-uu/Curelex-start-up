@@ -127,22 +127,30 @@ export class AppController {
   @Public()
   @Get('api/v1/health')
   getHealth() {
+    const endpoints = this.getApiEndpoints();
+    
     return {
       ...this.createBaseResponse(),
       message: `${this.APP_NAME} is running`,
-      uptime: process.uptime(),
+      uptime: Math.floor(process.uptime()),
       environment: process.env.NODE_ENV || 'development',
-      endpoints: {
-        auth: '/api/v1/auth',
-        patients: '/api/v1/patients',
-        doctors: '/api/v1/doctors',
-        appointments: '/api/v1/appointments',
-        vitals: '/api/v1/vitals',
-        prescriptions: '/api/v1/prescriptions',
-        notifications: '/api/v1/notifications',
-        integration: '/api/v1/integration',
-        docs: '/api/docs',
-      },
+      endpoints,
     };
+  }
+
+  private getApiEndpoints() {
+    const baseUrl = '/api/v1';
+    const endpoints = [
+      'auth', 'patients', 'doctors', 'appointments', 
+      'vitals', 'prescriptions', 'notifications', 'integration'
+    ];
+    
+    const endpointMap: Record<string, string> = {};
+    endpoints.forEach(endpoint => {
+      endpointMap[endpoint] = `${baseUrl}/${endpoint}`;
+    });
+    
+    endpointMap.docs = '/api/docs';
+    return endpointMap;
   }
 }

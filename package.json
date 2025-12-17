@@ -23,7 +23,11 @@
     "db:setup": "npm run prisma:migrate && npm run prisma:seed",
     "dev:setup": "npm run docker:dev && sleep 5 && npm run db:setup && npm run start:dev",
     "docker:dev": "docker-compose -f docker-compose.dev.yml up -d",
-    "docker:down": "docker-compose -f docker-compose.dev.yml down"
+    "docker:down": "docker-compose -f docker-compose.dev.yml down",
+    "security:check": "node scripts/security-check.js",
+    "build:secure": "npm run security:check && npm run build",
+    "clean:build": "rm -rf dist .next",
+    "prebuild": "npm run clean:build"
   },
   "dependencies": {
     "@nestjs/cache-manager": "^2.1.1",

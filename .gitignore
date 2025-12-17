@@ -202,3 +202,33 @@ dist
 # OS
 .DS_Store
 Thumbs.db
+
+# Security & Sensitive Files
+*.key
+*.pem
+*.p12
+*.pfx
+*.crt
+*.cer
+*.der
+secrets/
+keys/
+credentials/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+prisma/dev.db*
+
+# Backup files
+*.backup
+*.bak
+*.tmp
+
+# Build artifacts with potential security issues
+frontend/.next/
+frontend/out/
+frontend/build/
+dist/
+build/

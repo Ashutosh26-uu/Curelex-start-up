@@ -1,33 +1,51 @@
 export const APP_CONSTANTS = {
-  BCRYPT_ROUNDS: 12,
-  JWT_EXPIRES_IN: '15m',
-  JWT_REFRESH_EXPIRES_IN: '7d',
-  MAX_LOGIN_ATTEMPTS: 5,
-  ACCOUNT_LOCK_DURATION: 30 * 60 * 1000,
-  PASSWORD_RESET_EXPIRY: 15 * 60 * 1000,
-  RATE_LIMIT_TTL: 60 * 1000,
-  RATE_LIMIT_MAX: 100,
-  MAX_FILE_SIZE: 10 * 1024 * 1024,
-  ALLOWED_FILE_TYPES: ['image/jpeg', 'image/png', 'image/gif', 'application/pdf'],
-  DEFAULT_PAGE_SIZE: 20,
-  MAX_PAGE_SIZE: 100,
-  CACHE_TTL: 5 * 60,
-  CACHE_MAX_ITEMS: 100,
-  DB_CONNECTION_TIMEOUT: 30000,
-  DB_QUERY_TIMEOUT: 10000,
-  API_VERSION: 'v1',
-  API_PREFIX: 'api',
-  EMAIL_QUEUE_DELAY: 1000,
-  SMS_QUEUE_DELAY: 2000,
-  SESSION_EXPIRY: 7 * 24 * 60 * 60 * 1000,
-  MIN_PASSWORD_LENGTH: 8,
-  MAX_PASSWORD_LENGTH: 128,
-  MIN_NAME_LENGTH: 2,
-  MAX_NAME_LENGTH: 50,
-  DEFAULT_APPOINTMENT_DURATION: 30,
-  MAX_APPOINTMENTS_PER_DAY: 20,
-  VITAL_RETENTION_DAYS: 365,
+  BCRYPT_ROUNDS: parseInt(process.env.BCRYPT_ROUNDS || '12'),
+  JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || '15m',
+  JWT_REFRESH_EXPIRES_IN: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
+  MAX_LOGIN_ATTEMPTS: parseInt(process.env.MAX_LOGIN_ATTEMPTS || '5'),
+  ACCOUNT_LOCK_DURATION: parseInt(process.env.ACCOUNT_LOCK_DURATION || '1800000'),
+  PASSWORD_RESET_EXPIRY: parseInt(process.env.PASSWORD_RESET_EXPIRY || '900000'),
+  RATE_LIMIT_TTL: parseInt(process.env.RATE_LIMIT_TTL || '60000'),
+  RATE_LIMIT_MAX: parseInt(process.env.RATE_LIMIT_MAX || '100'),
+  MAX_FILE_SIZE: parseInt(process.env.MAX_FILE_SIZE || '10485760'),
+  ALLOWED_FILE_TYPES: (process.env.ALLOWED_FILE_TYPES || 'image/jpeg,image/png,image/gif,application/pdf').split(','),
+  DEFAULT_PAGE_SIZE: parseInt(process.env.DEFAULT_PAGE_SIZE || '20'),
+  MAX_PAGE_SIZE: parseInt(process.env.MAX_PAGE_SIZE || '100'),
+  CACHE_TTL: parseInt(process.env.CACHE_TTL || '300'),
+  CACHE_MAX_ITEMS: parseInt(process.env.CACHE_MAX_ITEMS || '100'),
+  DB_CONNECTION_TIMEOUT: parseInt(process.env.DB_CONNECTION_TIMEOUT || '30000'),
+  DB_QUERY_TIMEOUT: parseInt(process.env.DB_QUERY_TIMEOUT || '10000'),
+  API_VERSION: process.env.API_VERSION || 'v1',
+  API_PREFIX: process.env.API_PREFIX || 'api',
+  EMAIL_QUEUE_DELAY: parseInt(process.env.EMAIL_QUEUE_DELAY || '1000'),
+  SMS_QUEUE_DELAY: parseInt(process.env.SMS_QUEUE_DELAY || '2000'),
+  SESSION_EXPIRY: parseInt(process.env.SESSION_EXPIRY || '604800000'),
+  MIN_PASSWORD_LENGTH: parseInt(process.env.MIN_PASSWORD_LENGTH || '8'),
+  MAX_PASSWORD_LENGTH: parseInt(process.env.MAX_PASSWORD_LENGTH || '128'),
+  MIN_NAME_LENGTH: parseInt(process.env.MIN_NAME_LENGTH || '2'),
+  MAX_NAME_LENGTH: parseInt(process.env.MAX_NAME_LENGTH || '50'),
+  DEFAULT_APPOINTMENT_DURATION: parseInt(process.env.DEFAULT_APPOINTMENT_DURATION || '30'),
+  MAX_APPOINTMENTS_PER_DAY: parseInt(process.env.MAX_APPOINTMENTS_PER_DAY || '20'),
+  VITAL_RETENTION_DAYS: parseInt(process.env.VITAL_RETENTION_DAYS || '365'),
 } as const;
+
+// Validation function for constants
+export const validateConstants = (): void => {
+  const requiredEnvVars = ['JWT_SECRET', 'JWT_REFRESH_SECRET', 'DATABASE_URL'];
+  const missing = requiredEnvVars.filter(key => !process.env[key]);
+  
+  if (missing.length > 0) {
+    throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
+  }
+  
+  if (APP_CONSTANTS.BCRYPT_ROUNDS < 10 || APP_CONSTANTS.BCRYPT_ROUNDS > 15) {
+    throw new Error('BCRYPT_ROUNDS must be between 10 and 15');
+  }
+  
+  if (APP_CONSTANTS.MIN_PASSWORD_LENGTH < 8) {
+    throw new Error('MIN_PASSWORD_LENGTH must be at least 8');
+  }
+};
 
 export const ERROR_MESSAGES = {
   INVALID_CREDENTIALS: 'Invalid email or password',
