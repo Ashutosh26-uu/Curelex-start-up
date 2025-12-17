@@ -3,6 +3,7 @@ import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse, ApiRateLimitResponse
 import { Response } from 'express';
 import { AuthService } from './auth.service';
 import { LoginDto, PatientLoginDto, DoctorLoginDto } from './dto/login.dto';
+import { PatientRegisterDto } from './dto/patient-register.dto';
 import { RegisterDto } from './dto/register.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
@@ -196,13 +197,30 @@ export class AuthController {
     return this.authService.changePassword(req.user.id, changePasswordDto);
   }
 
-  @ApiOperation({ summary: 'Patient registration with captcha' })
+  @ApiOperation({ summary: 'Patient registration with password confirmation' })
+  @ApiResponse({ status: 201, description: 'Patient registered successfully' })
+  @ApiResponse({ status: 400, description: 'Registration failed - validation errors' })
+  @ApiResponse({ status: 409, description: 'User already exists' })
   @Public()
+  @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
   @Post('register/patient')
-  async registerPatient(@Body() patientRegisterDto: any, @Request() req: any) {
-    const ipAddress = req.ip || req.connection.remoteAddress;
+  async registerPatient(
+    @Body() patientRegisterDto: PatientRegisterDto, 
+    @Request() req: any,
+    @Res({ passthrough: true }) res: Response,
+    @Headers('x-forwarded-for') forwardedFor?: string
+  ) {
+    const ipAddress = forwardedFor || req.ip || req.connection.remoteAddress;
     const userAgent = req.get('User-Agent');
-    return this.authService.registerPatient(patientRegisterDto, ipAddress, userAgent);
+    
+    const result = await this.authService.patientRegister(patientRegisterDto, ipAddress, userAgent);
+    
+    // Set security headers
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('X-XSS-Protection', '1; mode=block');
+    
+    return result;
   }
 
   @ApiOperation({ summary: 'Doctor registration (Junior/Senior)' })

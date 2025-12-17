@@ -1,220 +1,309 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { PasswordInput } from '@/components/ui/PasswordInput';
 import { Select } from '@/components/ui/Select';
-import { Textarea } from '@/components/ui/Textarea';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import { Stethoscope } from 'lucide-react';
-import { patientApi } from '@/lib/api';
+import { Card } from '@/components/ui/Card';
+import { api } from '@/lib/api';
+import Link from 'next/link';
 
-interface RegisterForm {
-  firstName: string;
-  middleName?: string;
-  lastName: string;
-  age: number;
-  gender: string;
-  mobile: string;
-  email: string;
-  emergencyContact: string;
-  identificationNumber: string;
-}
+const registerSchema = z.object({
+  email: z.string().email('Please enter a valid email address'),
+  password: z
+    .string()
+    .min(8, 'Password must be at least 8 characters')
+    .regex(
+      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/,
+      'Password must contain uppercase, lowercase, number and special character'
+    ),
+  confirmPassword: z.string(),
+  firstName: z.string().min(2, 'First name must be at least 2 characters'),
+  lastName: z.string().min(2, 'Last name must be at least 2 characters'),
+  phone: z.string().regex(/^\+?[1-9]\d{1,14}$/, 'Please enter a valid phone number'),
+  dateOfBirth: z.string().optional(),
+  gender: z.string().optional(),
+  address: z.string().optional(),
+  city: z.string().optional(),
+  state: z.string().optional(),
+  zipCode: z.string().optional(),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords don't match",
+  path: ["confirmPassword"],
+});
+
+type RegisterForm = z.infer<typeof registerSchema>;
 
 export default function RegisterPage() {
   const router = useRouter();
-  const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const [isPatientRegistration, setIsPatientRegistration] = useState(false);
+  const [success, setSuccess] = useState('');
 
-  const { register, handleSubmit, formState: { errors } } = useForm<RegisterForm>();
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+    watch,
+  } = useForm<RegisterForm>({
+    resolver: zodResolver(registerSchema),
+  });
 
-  useEffect(() => {
-    setIsPatientRegistration(window.location.search.includes('type=patient'));
-  }, []);
+  const password = watch('password');
 
   const onSubmit = async (data: RegisterForm) => {
-    setLoading(true);
+    setIsLoading(true);
     setError('');
-    
+    setSuccess('');
+
     try {
-      const payload = {
-        ...data,
-        name: `${data.firstName} ${data.middleName ? data.middleName + ' ' : ''}${data.lastName}`,
-        medicalHistory: []
-      };
-      await patientApi.register(payload);
-      setSuccess(true);
-      setTimeout(() => router.push('/patient-login'), 3000);
+      const response = await api.post('/auth/register/patient', data);
+      
+      if (response.data.success) {
+        setSuccess('Registration successful! You can now login with your credentials.');
+        setTimeout(() => {
+          router.push('/patient-login');
+        }, 2000);
+      }
     } catch (err: any) {
-      setError(err.message || 'Registration failed');
+      const errorMessage = err.response?.data?.message || 'Registration failed. Please try again.';
+      setError(errorMessage);
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
-  if (success) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <Card className="max-w-md w-full">
-          <CardContent className="p-6 text-center">
-            <div className="text-green-600 text-6xl mb-4">✓</div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Registration Successful!</h2>
-            <p className="text-gray-600">Your account has been created. Redirecting to login...</p>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+  const getPasswordStrength = (password: string) => {
+    if (!password) return { strength: 0, text: '' };
+    
+    let strength = 0;
+    const checks = [
+      password.length >= 8,
+      /[a-z]/.test(password),
+      /[A-Z]/.test(password),
+      /\d/.test(password),
+      /[@$!%*?&]/.test(password),
+    ];
+    
+    strength = checks.filter(Boolean).length;
+    
+    const strengthText = ['Very Weak', 'Weak', 'Fair', 'Good', 'Strong'][strength - 1] || '';
+    const strengthColor = ['red', 'orange', 'yellow', 'lightgreen', 'green'][strength - 1] || 'gray';
+    
+    return { strength: (strength / 5) * 100, text: strengthText, color: strengthColor };
+  };
+
+  const passwordStrength = getPasswordStrength(password || '');
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4">
-      <div className="max-w-2xl mx-auto">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+      <Card className="w-full max-w-2xl p-8">
         <div className="text-center mb-8">
-          <Stethoscope className="h-12 w-12 text-primary-600 mx-auto" />
-          <h1 className="mt-4 text-3xl font-bold text-gray-900">
-            {isPatientRegistration ? 'Patient Registration' : 'User Registration'}
-          </h1>
-          <p className="mt-2 text-gray-600">
-            {isPatientRegistration ? 'Register as a patient to access healthcare services' : 'Join our healthcare platform - Made in India 🇮🇳'}
-          </p>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Create Patient Account</h1>
+          <p className="text-gray-600">Join our healthcare platform to manage your health</p>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Register as Patient</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-              {error && (
-                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
-                  {error}
-                </div>
-              )}
+        {error && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+            <p className="text-red-700 text-sm">{error}</p>
+          </div>
+        )}
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Input
-                  label="First Name *"
-                  {...register('firstName', { required: 'First name is required' })}
-                  error={errors.firstName?.message}
-                />
-                
-                <Input
-                  label="Middle Name (Optional)"
-                  {...register('middleName')}
-                  error={errors.middleName?.message}
-                />
-                
-                <Input
-                  label="Last Name *"
-                  {...register('lastName', { required: 'Last name is required' })}
-                  error={errors.lastName?.message}
-                />
-              </div>
+        {success && (
+          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+            <p className="text-green-700 text-sm">{success}</p>
+          </div>
+        )}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Input
-                  label="Age *"
-                  type="number"
-                  {...register('age', { 
-                    required: 'Age is required',
-                    min: { value: 1, message: 'Age must be positive' }
-                  })}
-                  error={errors.age?.message}
-                />
-                
-                <Input
-                  label="Identification Number (Aadhaar/Phone) *"
-                  placeholder="Enter Aadhaar or Phone number"
-                  {...register('identificationNumber', { 
-                    required: 'Identification number is required',
-                    minLength: { value: 10, message: 'Must be at least 10 digits' },
-                    maxLength: { value: 12, message: 'Must not exceed 12 digits' }
-                  })}
-                  error={errors.identificationNumber?.message}
-                />
-              </div>
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                First Name *
+              </label>
+              <Input
+                {...register('firstName')}
+                placeholder="Enter your first name"
+                error={errors.firstName?.message}
+              />
+            </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Select
-                  label="Gender *"
-                  options={[
-                    { value: '', label: 'Select Gender' },
-                    { value: 'MALE', label: 'Male' },
-                    { value: 'FEMALE', label: 'Female' },
-                    { value: 'OTHER', label: 'Other' }
-                  ]}
-                  {...register('gender', { required: 'Gender is required' })}
-                  error={errors.gender?.message}
-                />
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Last Name *
+              </label>
+              <Input
+                {...register('lastName')}
+                placeholder="Enter your last name"
+                error={errors.lastName?.message}
+              />
+            </div>
+          </div>
 
-                <div>
-                  <label className="text-sm font-medium text-gray-700">Mobile Number *</label>
-                  <div className="flex mt-1">
-                    <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">
-                      +91
-                    </span>
-                    <input
-                      type="tel"
-                      maxLength={10}
-                      className="flex-1 rounded-r-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                      placeholder="Enter 10-digit mobile number"
-                      {...register('mobile', { 
-                        required: 'Mobile number is required',
-                        pattern: {
-                          value: /^[0-9]{10}$/,
-                          message: 'Mobile number must be exactly 10 digits'
-                        }
-                      })}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Email Address *
+            </label>
+            <Input
+              {...register('email')}
+              type="email"
+              placeholder="Enter your email address"
+              error={errors.email?.message}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Phone Number *
+            </label>
+            <Input
+              {...register('phone')}
+              placeholder="+1234567890"
+              error={errors.phone?.message}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Password *
+            </label>
+            <PasswordInput
+              {...register('password')}
+              placeholder="Create a strong password"
+              error={errors.password?.message}
+            />
+            {password && (
+              <div className="mt-2">
+                <div className="flex items-center gap-2 mb-1">
+                  <div className="flex-1 bg-gray-200 rounded-full h-2">
+                    <div
+                      className="h-2 rounded-full transition-all duration-300"
+                      style={{
+                        width: `${passwordStrength.strength}%`,
+                        backgroundColor: passwordStrength.color,
+                      }}
                     />
                   </div>
-                  {errors.mobile && (
-                    <p className="text-sm text-red-600 mt-1">{errors.mobile.message}</p>
-                  )}
+                  <span className="text-xs text-gray-600">{passwordStrength.text}</span>
                 </div>
-              </div>
-
-              <Input
-                label="Email *"
-                type="email"
-                {...register('email', { 
-                  required: 'Email is required',
-                  pattern: { value: /^\S+@\S+$/i, message: 'Invalid email' }
-                })}
-                error={errors.email?.message}
-              />
-
-              <Input
-                label="Emergency Contact *"
-                placeholder="Emergency contact number"
-                {...register('emergencyContact', { required: 'Emergency contact is required' })}
-                error={errors.emergencyContact?.message}
-              />
-
-
-
-              <Button type="submit" className="w-full" loading={loading}>
-                {isPatientRegistration ? 'Register as Patient' : 'Register'}
-              </Button>
-              
-              <div className="text-center mt-4">
-                <p className="text-sm text-gray-600">
-                  Already have an account?{' '}
-                  <a 
-                    href={isPatientRegistration ? "/patient-login" : "/login"} 
-                    className="text-primary-600 hover:text-primary-700 font-medium"
-                  >
-                    Sign in here
-                  </a>
+                <p className="text-xs text-gray-500">
+                  Password must contain uppercase, lowercase, number and special character
                 </p>
               </div>
-            </form>
-          </CardContent>
-        </Card>
-      </div>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Confirm Password *
+            </label>
+            <PasswordInput
+              {...register('confirmPassword')}
+              placeholder="Confirm your password"
+              error={errors.confirmPassword?.message}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Date of Birth
+              </label>
+              <Input
+                {...register('dateOfBirth')}
+                type="date"
+                error={errors.dateOfBirth?.message}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Gender
+              </label>
+              <Select
+                {...register('gender')}
+                options={[
+                  { value: '', label: 'Select gender' },
+                  { value: 'Male', label: 'Male' },
+                  { value: 'Female', label: 'Female' },
+                  { value: 'Other', label: 'Other' },
+                ]}
+                error={errors.gender?.message}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Address
+            </label>
+            <Input
+              {...register('address')}
+              placeholder="Enter your address"
+              error={errors.address?.message}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                City
+              </label>
+              <Input
+                {...register('city')}
+                placeholder="City"
+                error={errors.city?.message}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                State
+              </label>
+              <Input
+                {...register('state')}
+                placeholder="State"
+                error={errors.state?.message}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                ZIP Code
+              </label>
+              <Input
+                {...register('zipCode')}
+                placeholder="ZIP Code"
+                error={errors.zipCode?.message}
+              />
+            </div>
+          </div>
+
+          <div className="pt-4">
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={isLoading}
+            >
+              {isLoading ? 'Creating Account...' : 'Create Account'}
+            </Button>
+          </div>
+
+          <div className="text-center pt-4">
+            <p className="text-sm text-gray-600">
+              Already have an account?{' '}
+              <Link href="/patient-login" className="text-blue-600 hover:text-blue-500 font-medium">
+                Sign in here
+              </Link>
+            </p>
+          </div>
+        </form>
+      </Card>
     </div>
   );
 }

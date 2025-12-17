@@ -2,107 +2,91 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuthStore } from '@/store/auth';
-import { authApi } from '@/lib/api';
+import { useAuthStore, getStoredTokens, isTokenExpired } from '@/store/auth';
 
 interface AuthGuardProps {
   children: React.ReactNode;
-  requireAuth?: boolean;
-  allowedRoles?: string[];
-  requireRecentAuth?: boolean;
+  redirectTo?: string;
 }
 
-export default function AuthGuard({ 
-  children, 
-  requireAuth = true, 
-  allowedRoles = [],
-  requireRecentAuth = false
-}: AuthGuardProps) {
+export function AuthGuard({ children, redirectTo = '/patient-login' }: AuthGuardProps) {
   const router = useRouter();
-  const { user, isAuthenticated, isLoading, initializeAuth, checkTokenExpiry, logout } = useAuthStore();
-  const [sessionValid, setSessionValid] = useState<boolean | null>(null);
+  const { isAuthenticated, user, setLoading, clearAuth } = useAuthStore();
+  const [isChecking, setIsChecking] = useState(true);
 
   useEffect(() => {
-    initializeAuth();
-  }, [initializeAuth]);
+    const checkAuth = async () => {
+      try {
+        const { accessToken, refreshToken } = getStoredTokens();
 
-  // Validate session on mount and periodically
-  useEffect(() => {
-    if (isAuthenticated && user) {
-      const validateSession = async () => {
-        try {
-          await authApi.validateSession();
-          setSessionValid(true);
-        } catch (error) {
-          console.error('Session validation failed:', error);
-          setSessionValid(false);
-          logout();
-          router.push('/login?reason=session_invalid');
-        }
-      };
-
-      validateSession();
-      
-      // Validate session every 5 minutes
-      const interval = setInterval(validateSession, 5 * 60 * 1000);
-      return () => clearInterval(interval);
-    }
-  }, [isAuthenticated, user, logout, router]);
-
-  // Check token expiry
-  useEffect(() => {
-    if (isAuthenticated && checkTokenExpiry()) {
-      // Token is about to expire, try to refresh
-      authApi.refreshToken().catch(() => {
-        logout();
-        router.push('/login?reason=token_expired');
-      });
-    }
-  }, [isAuthenticated, checkTokenExpiry, logout, router]);
-
-  useEffect(() => {
-    if (!isLoading && sessionValid !== null) {
-      if (requireAuth && (!isAuthenticated || !sessionValid)) {
-        router.push('/login?reason=auth_required');
-        return;
-      }
-
-      if (allowedRoles.length > 0 && user && !allowedRoles.includes(user.role)) {
-        router.push('/unauthorized?reason=insufficient_permissions');
-        return;
-      }
-
-      if (requireRecentAuth && user) {
-        // Check if user logged in within last 30 minutes for sensitive operations
-        const lastLogin = user.lastLoginAt ? new Date(user.lastLoginAt).getTime() : 0;
-        const thirtyMinutesAgo = Date.now() - (30 * 60 * 1000);
-        
-        if (lastLogin < thirtyMinutesAgo) {
-          router.push('/login?reason=reauth_required');
+        // No tokens found
+        if (!accessToken || !refreshToken) {
+          clearAuth();
+          router.push(redirectTo);
           return;
         }
-      }
-    }
-  }, [isAuthenticated, isLoading, user, requireAuth, allowedRoles, requireRecentAuth, sessionValid, router]);
 
-  if (isLoading || (requireAuth && sessionValid === null)) {
+        // Check if access token is expired
+        if (isTokenExpired(accessToken)) {
+          // Try to refresh token
+          try {
+            const response = await fetch('/api/auth/refresh', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ refreshToken }),
+            });
+
+            if (!response.ok) {
+              throw new Error('Token refresh failed');
+            }
+
+            const data = await response.json();
+            // Update tokens in store
+            useAuthStore.getState().updateTokens(data.accessToken, data.refreshToken);
+          } catch (error) {
+            // Refresh failed, clear auth and redirect
+            clearAuth();
+            router.push(redirectTo);
+            return;
+          }
+        }
+
+        // If we have a valid token but no user data, redirect to login
+        if (!user && accessToken) {
+          clearAuth();
+          router.push(redirectTo);
+          return;
+        }
+
+      } catch (error) {
+        console.error('Auth check failed:', error);
+        clearAuth();
+        router.push(redirectTo);
+      } finally {
+        setIsChecking(false);
+      }
+    };
+
+    checkAuth();
+  }, [isAuthenticated, user, router, redirectTo, clearAuth]);
+
+  // Show loading spinner while checking authentication
+  if (isChecking) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-gray-600">Verifying authentication...</p>
         </div>
       </div>
     );
   }
 
-  if (requireAuth && (!isAuthenticated || !sessionValid)) {
+  // If not authenticated, don't render children (redirect will happen)
+  if (!isAuthenticated || !user) {
     return null;
   }
 
-  if (allowedRoles.length > 0 && user && !allowedRoles.includes(user.role)) {
-    return null;
-  }
-
+  // User is authenticated, render children
   return <>{children}</>;
 }
