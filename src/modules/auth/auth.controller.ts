@@ -1,5 +1,5 @@
 import { Controller, Post, Body, UseGuards, Request, HttpCode, HttpStatus, Get, UseInterceptors, UsePipes, ValidationPipe, Res, Headers } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse, ApiRateLimitResponse } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
 import { Response } from 'express';
 import { AuthService } from './auth.service';
 import { LoginDto, PatientLoginDto, DoctorLoginDto } from './dto/login.dto';
@@ -272,11 +272,22 @@ export class AuthController {
     };
   }
 
-  @ApiOperation({ summary: 'Generate captcha' })
+  @ApiOperation({ summary: 'Generate captcha for login security' })
+  @ApiResponse({ status: 200, description: 'Captcha generated successfully' })
   @Public()
   @Get('captcha')
   async generateCaptcha() {
     return this.authService.generateCaptcha();
+  }
+
+  @ApiOperation({ summary: 'Validate captcha' })
+  @ApiResponse({ status: 200, description: 'Captcha validation result' })
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @Post('captcha/validate')
+  async validateCaptcha(@Body() { captchaId, captchaValue }: { captchaId: string; captchaValue: string }) {
+    const isValid = await this.authService.validateCaptcha(captchaId, captchaValue);
+    return { valid: isValid };
   }
 
   @ApiOperation({ summary: 'Phone/Email login' })
@@ -307,7 +318,7 @@ export class AuthController {
   @Post('social')
   async socialLogin(@Body() socialLoginDto: SocialLoginDto) {
     const user = await this.socialAuthService.validateSocialLogin(socialLoginDto);
-    return this.authService.generateTokens(user.id, user.email, user.role);
+    return this.authService.generateTokens(user.id, user.email, user.role, 'social-login');
   }
 
   @ApiOperation({ summary: 'Check if user exists by email or phone' })

@@ -25,9 +25,9 @@ export class UnifiedAuthService {
     const isEmail = identifier.includes('@');
     
     // Check if user exists
-    const existingUser = await this.prisma.user.findUnique({
-      where: isEmail ? { email: identifier } : { profile: { phone: identifier } },
-    });
+    const existingUser = isEmail 
+      ? await this.prisma.user.findUnique({ where: { email: identifier } })
+      : await this.prisma.user.findFirst({ where: { profile: { phone: identifier } } });
 
     if (existingUser) {
       throw new BadRequestException('User already exists');

@@ -26,11 +26,11 @@ export class AppointmentController {
   @Get()
   @Roles(UserRole.DOCTOR, UserRole.NURSE, UserRole.ADMIN)
   findAll(
-    @Request() req: any,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
+    @Request() req?: any,
   ) {
-    return this.appointmentService.findAll(req.user.id, req.user.role, page, limit);
+    return this.appointmentService.findAll(req?.user?.id, req?.user?.role, page, limit);
   }
 
   @ApiOperation({ summary: 'Get upcoming appointments' })
@@ -79,11 +79,11 @@ export class AppointmentController {
   @Get('me/all')
   @Roles(UserRole.PATIENT, UserRole.DOCTOR)
   getMyAppointments(
-    @Request() req: any,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
+    @Request() req?: any,
   ) {
-    return this.appointmentService.findAll(req.user.id, req.user.role, page, limit);
+    return this.appointmentService.findAll(req?.user?.id, req?.user?.role, page, limit);
   }
 
   @ApiOperation({ summary: 'Reschedule appointment' })

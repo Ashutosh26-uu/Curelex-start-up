@@ -6,6 +6,7 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { SocialAuthService } from './services/social-auth.service';
 import { UnifiedAuthService } from './services/unified-auth.service';
+import { CaptchaService } from '../../common/services/captcha.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { LocalStrategy } from './strategies/local.strategy';
 import { PrismaModule } from '../../common/prisma/prisma.module';
@@ -28,7 +29,7 @@ import { NotificationModule } from '../notification/notification.module';
     NotificationModule,
   ],
   controllers: [AuthController],
-  providers: [AuthService, SocialAuthService, UnifiedAuthService, JwtStrategy, LocalStrategy],
+  providers: [AuthService, SocialAuthService, UnifiedAuthService, CaptchaService, JwtStrategy, LocalStrategy],
   exports: [AuthService],
 })
 export class AuthModule {}

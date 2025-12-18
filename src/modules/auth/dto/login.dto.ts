@@ -18,16 +18,20 @@ export class LoginDto {
   })
   password: string;
 
-  @ApiProperty({ required: false, example: 'captcha123' })
+  @ApiProperty({ required: false, example: 'ABC123', description: 'Captcha value for security verification' })
   @IsOptional()
   @IsString()
   @MinLength(4)
   @MaxLength(10)
-  captcha?: string;
+  captchaValue?: string;
 
-  @ApiProperty({ required: false })
+  @ApiProperty({ required: false, description: 'Captcha ID from captcha generation' })
   @IsOptional()
   @IsString()
+  captchaId?: string;
+
+  @ApiProperty({ required: false, example: true })
+  @IsOptional()
   rememberMe?: boolean;
 }
 

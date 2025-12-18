@@ -351,4 +351,16 @@ export class PatientService {
       },
     });
   }
+
+  async verifyDoctorPatientAccess(doctorId: string, patientId: string): Promise<boolean> {
+    const assignment = await this.prisma.doctorPatientAssignment.findFirst({
+      where: {
+        doctorId,
+        patientId,
+        isActive: true,
+        isDeleted: false,
+      },
+    });
+    return !!assignment;
+  }
 }

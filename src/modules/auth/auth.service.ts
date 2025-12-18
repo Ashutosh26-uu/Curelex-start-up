@@ -3,6 +3,7 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { CaptchaService } from '../../common/services/captcha.service';
 import { LoginDto, PatientLoginDto, DoctorLoginDto } from './dto/login.dto';
 import { PatientRegisterDto } from './dto/patient-register.dto';
 import { RegisterDto } from './dto/register.dto';
@@ -21,6 +22,7 @@ export class AuthService {
     private prisma: PrismaService,
     private jwtService: JwtService,
     private configService: ConfigService,
+    private captchaService: CaptchaService,
   ) {}
 
   async patientRegister(registerDto: PatientRegisterDto, ipAddress?: string, userAgent?: string) {
@@ -125,6 +127,14 @@ export class AuthService {
 
   async login(loginDto: LoginDto & { expectedRole?: string }, ipAddress?: string, userAgent?: string) {
     try {
+      // Validate captcha if provided
+      if (loginDto.captchaId && loginDto.captchaValue) {
+        const isCaptchaValid = this.captchaService.validateCaptcha(loginDto.captchaId, loginDto.captchaValue);
+        if (!isCaptchaValid) {
+          await this.logFailedLogin(loginDto.email, 'Invalid captcha', ipAddress, userAgent);
+          throw new BadRequestException('Invalid captcha. Please try again.');
+        }
+      }
       // Find user with profile and role-specific data
       const user = await this.prisma.user.findUnique({
         where: { email: loginDto.email.toLowerCase() },
@@ -416,7 +426,11 @@ export class AuthService {
   }
 
   async generateCaptcha() {
-    return { captcha: 'TEMP123', message: 'Captcha generated' };
+    return this.captchaService.generateCaptcha();
+  }
+
+  async validateCaptcha(captchaId: string, captchaValue: string) {
+    return this.captchaService.validateCaptcha(captchaId, captchaValue);
   }
 
   async loginWithPhoneOrEmail(loginDto: any, ipAddress?: string, userAgent?: string) {

@@ -18,8 +18,8 @@ export class VitalsController {
   @ApiOperation({ summary: 'Record vital signs' })
   @Post()
   @Roles(UserRole.DOCTOR, UserRole.JUNIOR_DOCTOR, UserRole.NURSE)
-  create(@Body() createVitalDto: CreateVitalDto, @Request() req: any) {
-    return this.vitalsService.create(createVitalDto, req.user.id);
+  create(@Body() createVitalDto: CreateVitalDto, @Request() req?: any) {
+    return this.vitalsService.create(createVitalDto, req?.user?.id);
   }
 
   @ApiOperation({ summary: 'Get patient vitals' })
@@ -47,9 +47,9 @@ export class VitalsController {
   update(
     @Param('id') id: string,
     @Body() updateVitalsDto: UpdateVitalsDto,
-    @Request() req: any,
+    @Request() req?: any,
   ) {
-    return this.vitalsService.update(id, updateVitalsDto, req.user.id);
+    return this.vitalsService.update(id, updateVitalsDto, req?.user?.id);
   }
 
   @ApiOperation({ summary: 'Get patient vital history' })
@@ -67,7 +67,7 @@ export class VitalsController {
   @ApiOperation({ summary: 'Delete vital record' })
   @Delete(':id')
   @Roles(UserRole.DOCTOR, UserRole.JUNIOR_DOCTOR, UserRole.NURSE, UserRole.ADMIN)
-  delete(@Param('id') id: string, @Request() req: any) {
-    return this.vitalsService.delete(id, req.user.id);
+  delete(@Param('id') id: string, @Request() req?: any) {
+    return this.vitalsService.delete(id, req?.user?.id);
   }
 }

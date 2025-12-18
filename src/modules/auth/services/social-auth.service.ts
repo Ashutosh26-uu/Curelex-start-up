@@ -24,7 +24,7 @@ export class SocialAuthService {
         throw new UnauthorizedException('Unsupported social provider');
     }
 
-    let user = await this.prisma.user.findUnique({
+    let user: any = await this.prisma.user.findUnique({
       where: { email: userInfo.email },
       include: { profile: true, patient: true, doctor: true },
     });
@@ -38,13 +38,12 @@ export class SocialAuthService {
           password: randomPassword,
           role: 'PATIENT',
           isActive: true,
-          emailVerified: true,
+          emailVerifiedAt: new Date(),
           profile: {
             create: {
               firstName: userInfo.firstName || name?.split(' ')[0] || 'User',
               lastName: userInfo.lastName || name?.split(' ').slice(1).join(' ') || '',
               phone: userInfo.phone || '',
-              profilePicture: picture || userInfo.picture,
             },
           },
           patient: {
