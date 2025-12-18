@@ -10,7 +10,11 @@ export const metadata: Metadata = {
   description: 'Comprehensive healthcare platform with telemedicine capabilities',
   keywords: 'healthcare, telemedicine, patient portal, doctor dashboard, medical records',
   authors: [{ name: 'Healthcare Platform Team' }],
-  viewport: 'width=device-width, initial-scale=1',
+};
+
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
 };
 
 export default function RootLayout({
@@ -22,7 +26,6 @@ export default function RootLayout({
     <html lang="en">
       <head>
         <meta charSet="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="theme-color" content="#2563eb" />
         <link rel="icon" href="/favicon.ico" />
       </head>

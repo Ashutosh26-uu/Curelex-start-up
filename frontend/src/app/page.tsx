@@ -6,6 +6,7 @@ import { useAuthStore } from '@/store/auth';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import Link from 'next/link';
+import Image from 'next/image';
 import { 
   Heart, 
   Shield, 
@@ -71,30 +72,47 @@ export default function HomePage() {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-cyan-50">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-cyan-50 relative">
+      {/* Background Logo */}
+      <div className="fixed inset-0 flex items-center justify-center pointer-events-none z-0">
+        <Image
+          src="/images/crelex.jpg"
+          alt="CureLex Background"
+          width={600}
+          height={600}
+          className="opacity-10 grayscale"
+        />
+      </div>
+
       {/* Header */}
-      <header className="bg-white/80 backdrop-blur-sm border-b border-gray-200 sticky top-0 z-50">
+      <header className="bg-white/80 backdrop-blur-sm border-b border-gray-200 sticky top-0 z-50 relative">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <div className="flex items-center gap-2">
-              <Heart className="w-8 h-8 text-blue-600" />
-              <span className="text-xl font-bold text-gray-900">HealthCare Platform</span>
+            <div className="flex items-center gap-3">
+              <Image
+                src="/images/crelex.jpg"
+                alt="CureLex Logo"
+                width={40}
+                height={40}
+                className="w-10 h-10 rounded-lg"
+              />
+              <span className="text-xl font-bold text-gray-900">CureLex</span>
             </div>
             
             <div className="flex items-center gap-4">
               <Link
-                href="/patient-login"
+                href="/auth?role=patient"
                 className="text-gray-600 hover:text-gray-900 font-medium"
               >
                 Patient Login
               </Link>
               <Link
-                href="/doctor-login"
+                href="/auth?role=doctor"
                 className="text-gray-600 hover:text-gray-900 font-medium"
               >
                 Doctor Login
               </Link>
-              <Link href="/register">
+              <Link href="/auth">
                 <Button>Get Started</Button>
               </Link>
             </div>
@@ -105,8 +123,14 @@ export default function HomePage() {
       {/* Hero Section */}
       <section className="py-20 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto text-center">
-          <div className="inline-flex items-center justify-center w-20 h-20 bg-blue-100 rounded-full mb-8">
-            <Heart className="w-10 h-10 text-blue-600" />
+          <div className="inline-flex items-center justify-center mb-8">
+            <Image
+              src="/images/crelex.jpg"
+              alt="CureLex Logo"
+              width={80}
+              height={80}
+              className="w-20 h-20 rounded-xl"
+            />
           </div>
           
           <h1 className="text-4xl md:text-6xl font-bold text-gray-900 mb-6">
@@ -120,15 +144,15 @@ export default function HomePage() {
           </p>
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/register">
+            <Link href="/auth">
               <Button size="lg" className="w-full sm:w-auto">
-                Create Patient Account
+                Get Started Now
                 <ArrowRight className="w-5 h-5 ml-2" />
               </Button>
             </Link>
-            <Link href="/patient-login">
+            <Link href="/auth">
               <Button variant="outline" size="lg" className="w-full sm:w-auto">
-                Sign In to Portal
+                Sign In
               </Button>
             </Link>
           </div>
@@ -165,64 +189,39 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Benefits Section */}
-      <section className="py-20 px-4 sm:px-6 lg:px-8">
+      {/* About Us Section */}
+      <section className="py-20 px-4 sm:px-6 lg:px-8 bg-white relative z-10">
         <div className="max-w-7xl mx-auto">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-            <div>
-              <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-6">
-                Complete Healthcare Management
-              </h2>
-              <p className="text-lg text-gray-600 mb-8">
-                Our platform provides everything you need to manage your health effectively, 
-                from booking appointments to tracking your wellness journey.
-              </p>
-              
-              <div className="space-y-4">
-                {benefits.map((benefit, index) => (
-                  <div key={index} className="flex items-center gap-3">
-                    <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0" />
-                    <span className="text-gray-700">{benefit}</span>
-                  </div>
-                ))}
-              </div>
-              
-              <div className="mt-8">
-                <Link href="/register">
-                  <Button size="lg">
-                    Start Your Health Journey
-                    <ArrowRight className="w-5 h-5 ml-2" />
-                  </Button>
-                </Link>
-              </div>
-            </div>
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-6">
+              About CureLex
+            </h2>
+          </div>
+          
+          <div className="max-w-4xl mx-auto space-y-6 text-lg text-gray-700 leading-relaxed">
+            <p>
+              Curelex is a next-generation hybrid e-clinic model designed to bring super-speciality healthcare, telemedicine, diagnostics, pathology, and pharmacy support to rural and semi-urban communities — without performing any invasive procedures. We provide pure OPD-based services focused on accurate consultation and timely treatment.
+            </p>
             
-            <div className="relative">
-              <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-8 text-white">
-                <div className="grid grid-cols-2 gap-6">
-                  <div className="text-center">
-                    <Users className="w-8 h-8 mx-auto mb-2" />
-                    <div className="text-2xl font-bold">10K+</div>
-                    <div className="text-blue-100">Patients</div>
-                  </div>
-                  <div className="text-center">
-                    <Shield className="w-8 h-8 mx-auto mb-2" />
-                    <div className="text-2xl font-bold">100%</div>
-                    <div className="text-blue-100">Secure</div>
-                  </div>
-                  <div className="text-center">
-                    <Calendar className="w-8 h-8 mx-auto mb-2" />
-                    <div className="text-2xl font-bold">24/7</div>
-                    <div className="text-blue-100">Available</div>
-                  </div>
-                  <div className="text-center">
-                    <Activity className="w-8 h-8 mx-auto mb-2" />
-                    <div className="text-2xl font-bold">Real-time</div>
-                    <div className="text-blue-100">Monitoring</div>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <p>
+              At Curelex, patients visit their nearest e-clinic where a qualified junior doctor performs physical examination, checks vitals, and documents medical history. During the same visit, the patient is connected to a super-specialist through secure telemedicine, ensuring expert diagnosis without travelling to big cities.
+            </p>
+            
+            <p>
+              Curelex centres follow a zero-invasive care model (only OPD). For complete clinical support, we have partnerships with pathology/laboratory service providers for sample collection and reporting, nearby pharmacies for quick access to prescribed medicines, and hospitals for referral and admission only when required.
+            </p>
+            
+            <p>
+              This ensures that every patient gets the right doctor, right diagnosis, and right treatment at the right time, while maintaining full safety, transparency, and affordability.
+            </p>
+            
+            <p className="text-center font-semibold text-blue-600 text-xl">
+              We believe that quality healthcare should reach everyone, not just metropolitan cities. Curelex is committed to bridging the gap between rural and urban healthcare by combining modern telemedicine with physical doctor support for trustworthy, personalised care.
+            </p>
+            
+            <p className="text-center text-2xl font-bold text-gray-900 mt-8">
+              Curelex — Telemedicine that feels like offline care.
+            </p>
           </div>
         </div>
       </section>
@@ -238,12 +237,12 @@ export default function HomePage() {
           </p>
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/register">
+            <Link href="/auth">
               <Button size="lg" className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700">
-                Create Free Account
+                Create Your Account
               </Button>
             </Link>
-            <Link href="/patient-login">
+            <Link href="/auth">
               <Button variant="outline" size="lg" className="w-full sm:w-auto border-white text-white hover:bg-white hover:text-gray-900">
                 Sign In
               </Button>
@@ -253,23 +252,65 @@ export default function HomePage() {
       </section>
 
       {/* Footer */}
-      <footer className="bg-white border-t border-gray-200 py-12 px-4 sm:px-6 lg:px-8">
+      <footer className="bg-gray-900 text-white py-16 px-4 sm:px-6 lg:px-8 relative z-10">
         <div className="max-w-7xl mx-auto">
-          <div className="flex flex-col md:flex-row justify-between items-center">
-            <div className="flex items-center gap-2 mb-4 md:mb-0">
-              <Heart className="w-6 h-6 text-blue-600" />
-              <span className="text-lg font-semibold text-gray-900">HealthCare Platform</span>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {/* Company Info */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <Image
+                  src="/images/crelex.jpg"
+                  alt="CureLex Logo"
+                  width={50}
+                  height={50}
+                  className="w-12 h-12 bg-white rounded-lg p-1"
+                />
+                <span className="text-xl font-bold">CureLex</span>
+              </div>
+              <p className="text-gray-300 text-sm">
+                Telemedicine that feels like offline care. Bringing super-speciality healthcare to rural communities.
+              </p>
             </div>
-            
-            <div className="flex gap-6 text-sm text-gray-600">
-              <a href="#" className="hover:text-gray-900">Privacy Policy</a>
-              <a href="#" className="hover:text-gray-900">Terms of Service</a>
-              <a href="#" className="hover:text-gray-900">Contact Support</a>
+
+
+
+            {/* Contact Info */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold">Contact Us</h3>
+              <div className="space-y-2 text-sm text-gray-300">
+                <p>📞 +91 89578 09085</p>
+                <p>📍 C/o Shiv Kumari Devi, Muhmmadpur Pachewara, Pachevara, Mirzapur, Chunar, Uttar Pradesh, India, 231305</p>
+              </div>
+            </div>
+
+            {/* Social Media */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold">Follow Us</h3>
+              <div className="grid grid-cols-2 gap-3">
+                <a href="https://www.instagram.com/curelexofficial?igsh=MWNobGQzMHdhdTRpNg==" target="_blank" className="flex items-center gap-2 text-gray-300 hover:text-pink-400 transition-colors">
+                  <span className="text-lg">📷</span> Instagram
+                </a>
+                <a href="https://www.youtube.com/@CurelexOfficial" target="_blank" className="flex items-center gap-2 text-gray-300 hover:text-red-400 transition-colors">
+                  <span className="text-lg">📺</span> YouTube
+                </a>
+                <a href="https://whatsapp.com/channel/0029Vb6h5rD90x2oWxVpiF1N" target="_blank" className="flex items-center gap-2 text-gray-300 hover:text-green-400 transition-colors">
+                  <span className="text-lg">💬</span> WhatsApp
+                </a>
+                <a href="#" className="flex items-center gap-2 text-gray-300 hover:text-blue-400 transition-colors">
+                  <span className="text-lg">📘</span> Facebook
+                </a>
+                <a href="#" className="flex items-center gap-2 text-gray-300 hover:text-blue-300 transition-colors">
+                  <span className="text-lg">🐦</span> Twitter
+                </a>
+                <a href="#" className="flex items-center gap-2 text-gray-300 hover:text-blue-500 transition-colors">
+                  <span className="text-lg">💼</span> LinkedIn
+                </a>
+              </div>
             </div>
           </div>
           
-          <div className="mt-8 pt-8 border-t border-gray-200 text-center text-sm text-gray-500">
-            © 2024 HealthCare Platform. All rights reserved. HIPAA Compliant.
+          <div className="mt-12 pt-8 border-t border-gray-700 text-center text-sm text-gray-400">
+            © 2024 CureLex Healthcare Platform. All rights reserved. HIPAA Compliant.
           </div>
         </div>
       </footer>

@@ -9,6 +9,9 @@ import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
+import { SocialLoginDto, UnifiedAuthDto } from './dto/social-login.dto';
+import { SocialAuthService } from './services/social-auth.service';
+import { UnifiedAuthService } from './services/unified-auth.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { Public } from '../../common/decorators/public.decorator';
 import { LoggingInterceptor } from '../../common/interceptors/logging.interceptor';
@@ -16,7 +19,11 @@ import { LoggingInterceptor } from '../../common/interceptors/logging.intercepto
 @ApiTags('Authentication')
 @Controller('auth')
 export class AuthController {
-  constructor(private authService: AuthService) {}
+  constructor(
+    private authService: AuthService,
+    private socialAuthService: SocialAuthService,
+    private unifiedAuthService: UnifiedAuthService,
+  ) {}
 
   @ApiOperation({ summary: 'Patient Portal Login' })
   @ApiResponse({ status: 200, description: 'Login successful' })
@@ -280,5 +287,36 @@ export class AuthController {
     const ipAddress = req.ip || req.connection.remoteAddress;
     const userAgent = req.get('User-Agent');
     return this.authService.loginWithPhoneOrEmail(loginDto, ipAddress, userAgent);
+  }
+
+  @ApiOperation({ summary: 'Unified authentication - Login or Signup like Instagram' })
+  @ApiResponse({ status: 200, description: 'Authentication successful' })
+  @ApiResponse({ status: 400, description: 'Validation failed' })
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @Post('unified')
+  async unifiedAuth(@Body() unifiedAuthDto: UnifiedAuthDto) {
+    return this.unifiedAuthService.unifiedAuth(unifiedAuthDto);
+  }
+
+  @ApiOperation({ summary: 'Social login (Google, Facebook, Apple)' })
+  @ApiResponse({ status: 200, description: 'Social login successful' })
+  @ApiResponse({ status: 401, description: 'Invalid social token' })
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @Post('social')
+  async socialLogin(@Body() socialLoginDto: SocialLoginDto) {
+    const user = await this.socialAuthService.validateSocialLogin(socialLoginDto);
+    return this.authService.generateTokens(user.id, user.email, user.role);
+  }
+
+  @ApiOperation({ summary: 'Check if user exists by email or phone' })
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @Post('check-user')
+  async checkUser(@Body() { identifier }: { identifier: string }) {
+    const isEmail = identifier.includes('@');
+    const user = await this.authService.findUserByIdentifier(identifier, isEmail);
+    return { exists: !!user, hasPassword: user?.password ? true : false };
   }
 }

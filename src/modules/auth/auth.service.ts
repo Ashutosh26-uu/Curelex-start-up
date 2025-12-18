@@ -422,4 +422,18 @@ export class AuthService {
   async loginWithPhoneOrEmail(loginDto: any, ipAddress?: string, userAgent?: string) {
     return this.login(loginDto, ipAddress, userAgent);
   }
+
+  async findUserByIdentifier(identifier: string, isEmail: boolean) {
+    if (isEmail) {
+      return this.prisma.user.findUnique({
+        where: { email: identifier },
+        select: { id: true, email: true, password: true }
+      });
+    } else {
+      return this.prisma.user.findFirst({
+        where: { profile: { phone: identifier } },
+        select: { id: true, email: true, password: true }
+      });
+    }
+  }
 }

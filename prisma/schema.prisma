@@ -28,11 +28,15 @@ model User {
   emailVerifiedAt  DateTime?
   twoFactorEnabled Boolean   @default(false)
   twoFactorSecret  String?
-  backupCodes      String?
+  backupCodes      String[]
   sessionId        String?
   ipAddress        String?
   userAgent        String?
   loginCount       Int       @default(0)
+  profilePicture   String?
+  deviceFingerprint String?
+  lastPasswordChange DateTime?
+  accountLockUntil DateTime?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
   deletedAt        DateTime?
@@ -44,6 +48,7 @@ model User {
   notifications Notification[]
   sessions      UserSession[]
   loginHistory  LoginHistory[]
+  trustedDevices TrustedDevice[]
 
   @@map("users")
 }
@@ -302,6 +307,25 @@ model Notification {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("notifications")
+}
+
+model TrustedDevice {
+  id                String   @id @default(cuid())
+  userId            String
+  deviceFingerprint String
+  deviceName        String
+  deviceType        String   @default("unknown")
+  userAgent         String?
+  ipAddress         String?
+  isActive          Boolean  @default(true)
+  lastUsed          DateTime @default(now())
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, deviceFingerprint])
+  @@map("trusted_devices")
 }
 
 model AuditLog {
