@@ -1,4 +1,4 @@
-import { Injectable, CanActivate, ExecutionContext, TooManyRequestsException } from '@nestjs/common';
+import { Injectable, CanActivate, ExecutionContext, HttpException, HttpStatus } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -25,7 +25,7 @@ export class UserRateLimitGuard implements CanActivate {
     });
 
     if (requestCount >= this.MAX_REQUESTS_PER_USER) {
-      throw new TooManyRequestsException('Rate limit exceeded for user');
+      throw new HttpException('Rate limit exceeded for user', HttpStatus.TOO_MANY_REQUESTS);
     }
 
     // Log the request

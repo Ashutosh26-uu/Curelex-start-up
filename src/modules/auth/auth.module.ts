@@ -29,7 +29,21 @@ import { NotificationModule } from '../notification/notification.module';
     NotificationModule,
   ],
   controllers: [AuthController],
-  providers: [AuthService, SocialAuthService, UnifiedAuthService, CaptchaService, JwtStrategy, LocalStrategy],
+  providers: [
+    AuthService, 
+    SocialAuthService, 
+    UnifiedAuthService, 
+    CaptchaService, 
+    JwtStrategy, 
+    LocalStrategy,
+    {
+      provide: 'TokenBlacklistService',
+      useValue: {
+        isTokenBlacklisted: () => false,
+        blacklistToken: () => Promise.resolve(),
+      },
+    },
+  ],
   exports: [AuthService],
 })
 export class AuthModule {}

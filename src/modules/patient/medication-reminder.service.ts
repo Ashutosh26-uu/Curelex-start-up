@@ -16,9 +16,9 @@ export class MedicationReminderService {
     });
 
     for (const prescription of activePrescriptions) {
-      await this.notificationService.sendNotification({
+      await this.notificationService.createNotification({
         userId: prescription.patient.userId,
-        type: 'MEDICATION_REMINDER',
+        type: 'MEDICATION_REMINDER' as any,
         title: 'Medication Reminder',
         message: `Time to take: ${prescription.medication} - ${prescription.dosage}`,
       });

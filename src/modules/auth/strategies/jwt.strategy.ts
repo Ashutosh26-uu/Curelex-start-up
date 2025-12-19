@@ -3,14 +3,14 @@ import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../common/prisma/prisma.service';
-import { TokenBlacklistService } from '../../../common/services/token-blacklist.service';
+import { Inject } from '@nestjs/common';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(
     private configService: ConfigService,
     private prisma: PrismaService,
-    private tokenBlacklist: TokenBlacklistService,
+    @Inject('TokenBlacklistService') private tokenBlacklist: any,
   ) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),

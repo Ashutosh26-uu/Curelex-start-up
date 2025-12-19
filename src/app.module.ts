@@ -72,13 +72,10 @@ const createCoreModules = () => {
         },
         inject: [ConfigService],
       }),
-      CacheModule.registerAsync({
+      CacheModule.register({
         isGlobal: true,
-        useFactory: (configService: ConfigService) => ({
-          ttl: configService.get<number>('CACHE_TTL', 300),
-          max: configService.get<number>('CACHE_MAX_ITEMS', 100),
-        }),
-        inject: [ConfigService],
+        ttl: 300000,
+        max: 1000,
       }),
       ThrottlerModule.forRootAsync({
         useFactory: (configService: ConfigService) => [{
