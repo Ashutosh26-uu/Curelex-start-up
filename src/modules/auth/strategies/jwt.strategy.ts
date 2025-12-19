@@ -3,12 +3,14 @@ import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../common/prisma/prisma.service';
+import { TokenBlacklistService } from '../../../common/services/token-blacklist.service';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(
     private configService: ConfigService,
     private prisma: PrismaService,
+    private tokenBlacklist: TokenBlacklistService,
   ) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
@@ -20,8 +22,13 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
   async validate(payload: any) {
     // Validate payload structure
-    if (!payload.sub || !payload.email || !payload.role) {
+    if (!payload.sub || !payload.email || !payload.role || !payload.jti) {
       throw new UnauthorizedException('Invalid token payload');
+    }
+
+    // Check if token is blacklisted
+    if (await this.tokenBlacklist.isTokenBlacklisted(payload.jti)) {
+      throw new UnauthorizedException('Token has been revoked');
     }
 
     // Check token age (reject tokens older than expected)

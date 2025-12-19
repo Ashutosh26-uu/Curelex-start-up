@@ -5,14 +5,14 @@ import { Public } from './common/decorators/public.decorator';
 @ApiTags('System')
 @Controller()
 export class AppController {
-  private readonly APP_VERSION = '1.0.0';
-  private readonly APP_NAME = 'Healthcare Telemedicine Platform API';
+  private static readonly APP_VERSION = '1.0.0';
+  private static readonly APP_NAME = 'Healthcare Telemedicine Platform API';
 
   private createBaseResponse() {
     return {
       status: 'healthy',
       timestamp: new Date().toISOString(),
-      version: this.APP_VERSION,
+      version: AppController.APP_VERSION,
     };
   }
 
@@ -42,6 +42,10 @@ export class AppController {
   @Public()
   @Get('about')
   getAbout() {
+    return this.getCompanyInfo();
+  }
+
+  private getCompanyInfo() {
     return {
       company: 'Curelex HealthTech',
       founded: '2024',
@@ -127,30 +131,42 @@ export class AppController {
   @Public()
   @Get('api/v1/health')
   getHealth() {
-    const endpoints = this.getApiEndpoints();
-    
-    return {
-      ...this.createBaseResponse(),
-      message: `${this.APP_NAME} is running`,
-      uptime: Math.floor(process.uptime()),
-      environment: process.env.NODE_ENV || 'development',
-      endpoints,
-    };
+    try {
+      const endpoints = this.getApiEndpoints();
+      
+      return {
+        ...this.createBaseResponse(),
+        message: `${AppController.APP_NAME} is running`,
+        uptime: Math.floor(process.uptime()),
+        environment: process.env.NODE_ENV || 'development',
+        endpoints,
+      };
+    } catch (error) {
+      return {
+        status: 'error',
+        message: 'Health check failed',
+        timestamp: new Date().toISOString()
+      };
+    }
   }
 
-  private getApiEndpoints() {
-    const baseUrl = '/api/v1';
-    const endpoints = [
-      'auth', 'patients', 'doctors', 'appointments', 
-      'vitals', 'prescriptions', 'notifications', 'integration'
-    ];
-    
-    const endpointMap: Record<string, string> = {};
-    endpoints.forEach(endpoint => {
-      endpointMap[endpoint] = `${baseUrl}/${endpoint}`;
-    });
-    
-    endpointMap.docs = '/api/docs';
-    return endpointMap;
+  private getApiEndpoints(): Record<string, string> {
+    try {
+      const baseUrl = '/api/v1';
+      const endpoints = [
+        'auth', 'patients', 'doctors', 'appointments', 
+        'vitals', 'prescriptions', 'notifications', 'integration'
+      ];
+      
+      const endpointMap = endpoints.reduce((acc, endpoint) => {
+        acc[endpoint] = `${baseUrl}/${endpoint}`;
+        return acc;
+      }, {} as Record<string, string>);
+      
+      endpointMap.docs = '/api/docs';
+      return endpointMap;
+    } catch (error) {
+      return { error: 'Unable to load endpoints' };
+    }
   }
 }

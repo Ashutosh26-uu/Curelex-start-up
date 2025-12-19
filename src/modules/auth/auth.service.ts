@@ -252,11 +252,13 @@ export class AuthService {
   }
 
   async generateTokens(userId: string, email: string, role: string, sessionId: string) {
+    const jti = uuidv4(); // JWT ID for token tracking
     const payload = { 
       sub: userId, 
       email, 
       role, 
       sessionId,
+      jti,
       iat: Math.floor(Date.now() / 1000)
     };
 
@@ -303,8 +305,20 @@ export class AuthService {
     }
   }
 
-  async logout(userId: string, sessionId: string) {
+  async logout(userId: string, sessionId: string, jti?: string) {
     await this.prisma.$transaction(async (tx) => {
+      // Blacklist current token if JTI provided
+      if (jti) {
+        await tx.auditLog.create({
+          data: {
+            userId,
+            action: 'TOKEN_BLACKLISTED',
+            resource: 'JWT',
+            details: JSON.stringify({ jti, reason: 'logout' })
+          }
+        });
+      }
+
       // Clear refresh token
       await tx.user.update({
         where: { id: userId },
