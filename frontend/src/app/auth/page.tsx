@@ -271,6 +271,7 @@ export default function AuthPage() {
                     value={gender}
                     onChange={(e) => setGender(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    aria-label="Select Gender"
                     required
                   >
                     <option value="">Select Gender</option>
