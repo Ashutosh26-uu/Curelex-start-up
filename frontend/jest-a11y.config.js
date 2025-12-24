@@ -1,0 +1,1 @@
+// jest-a11y.config.js\nmodule.exports = {\n  testEnvironment: 'jsdom',\n  setupFilesAfterEnv: ['<rootDir>/src/test/setup-a11y.ts'],\n  testMatch: ['**/__tests__/**/*.a11y.(ts|tsx|js|jsx)'],\n  collectCoverageFrom: [\n    'src/**/*.{ts,tsx}',\n    '!src/**/*.d.ts',\n    '!src/test/**/*',\n  ],\n  moduleNameMapping: {\n    '^@/(.*)$': '<rootDir>/src/$1',\n  },\n};
