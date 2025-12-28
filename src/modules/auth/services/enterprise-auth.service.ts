@@ -206,7 +206,7 @@ export class EnterpriseAuthService {
       
       if (isValid) {
         // Remove used backup code
-        const updatedCodes = backupCodes.filter(c => c !== backupCode);
+        const updatedCodes = Array.isArray(backupCodes) ? backupCodes.filter(c => c !== backupCode) : [];
         await this.prisma.user.update({
           where: { id: userId },
           data: { backupCodes: updatedCodes }
