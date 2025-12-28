@@ -150,6 +150,8 @@ export default function AuthPage() {
           width={400}
           height={400}
           className="opacity-15 grayscale"
+          priority
+          style={{ width: 'auto', height: 'auto' }}
         />
       </div>
 
@@ -163,6 +165,7 @@ export default function AuthPage() {
               height={48}
               className="w-12 h-12 rounded-lg"
               priority
+              style={{ width: 'auto', height: 'auto' }}
             />
             <h1 className="text-2xl font-bold text-gray-900">CureLex</h1>
           </div>
@@ -235,8 +238,43 @@ export default function AuthPage() {
             )}
           </div>
 
+          {mode === 'login' && (
+            <div className="space-y-2">
+              <label htmlFor="loginRole" className="text-sm font-medium text-gray-900 block">
+                Login as *
+              </label>
+              <select
+                id="loginRole"
+                value={role}
+                onChange={(e) => setRole(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
+                required
+              >
+                <option value="PATIENT">Patient</option>
+                <option value="DOCTOR">Doctor</option>
+                <option value="NURSE">Nurse</option>
+              </select>
+            </div>
+          )}
+
           {mode === 'signup' && (
             <div className="space-y-4 max-h-96 overflow-y-auto">
+              <div className="space-y-2">
+                <label htmlFor="role" className="text-sm font-medium text-gray-900 block">
+                  I am a *
+                </label>
+                <select
+                  id="role"
+                  value={role}
+                  onChange={(e) => setRole(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
+                  required
+                >
+                  <option value="PATIENT">Patient</option>
+                  <option value="DOCTOR">Doctor</option>
+                  <option value="NURSE">Nurse</option>
+                </select>
+              </div>
               <div className="space-y-2">
                 <label htmlFor="fullName" className="text-sm font-medium text-gray-900 block">
                   Full Name *
