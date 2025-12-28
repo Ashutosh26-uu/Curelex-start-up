@@ -201,7 +201,7 @@ export class EnterpriseAuthService {
       });
     } else if (backupCode) {
       // Verify backup code
-      const backupCodes = user.backupCodes || [];
+      const backupCodes = user.backupCodes ? JSON.parse(user.backupCodes) : [];
       isValid = backupCodes.includes(backupCode);
       
       if (isValid) {
@@ -209,7 +209,7 @@ export class EnterpriseAuthService {
         const updatedCodes = Array.isArray(backupCodes) ? backupCodes.filter(c => c !== backupCode) : [];
         await this.prisma.user.update({
           where: { id: userId },
-          data: { backupCodes: updatedCodes }
+          data: { backupCodes: JSON.stringify(updatedCodes) }
         });
       }
     }
