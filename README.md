@@ -177,56 +177,43 @@ A comprehensive NestJS healthcare platform with advanced patient care, AI-powere
    - Doctor-patient assignment coordination
    - System configuration and maintenance
 
-## 🚀 Quick Start
+## 🚀 Quick Start Guide
 
-### **Prerequisites**
+### Option 1: Complete Setup (Recommended)
+```bash
+# Run the complete setup script
+start-complete.bat
+```
 
-- **Node.js 18+** - JavaScript runtime
-- **Docker & Docker Compose** - Containerization
-- **PostgreSQL 14+** - Primary database
-- **Redis 6+** - Caching and sessions
-- **Git** - Version control
+### Option 2: Backend Only
+```bash
+# Run backend only setup
+start-backend-only.bat
+```
 
-### **Installation**
+### Option 3: Production Deployment
+```bash
+# Deploy in production mode
+deploy-production.bat
+```
 
-1. **Clone and setup**:
-   ```bash
-   git clone <repository-url>
-   cd healthcare-telemedicine-platform
-   npm install
-   ```
+### Manual Setup
+```bash
+# 1. Start Docker services
+npm run docker:dev
 
-2. **Environment configuration**:
-   ```bash
-   cp .env.example .env
-   # Configure your environment variables:
-   # - Database URLs
-   # - JWT secrets
-   # - Google Meet API credentials
-   # - Email/SMS service credentials
-   ```
+# 2. Setup database
+npm run prisma:migrate
+npm run prisma:generate
+npm run prisma:seed
 
-3. **Start development environment**:
-   ```bash
-   npm run docker:dev
-   ```
+# 3. Start backend
+npm run start:dev
 
-4. **Database setup**:
-   ```bash
-   npm run prisma:migrate
-   npm run prisma:generate
-   npm run prisma:seed  # Optional: Load sample data
-   ```
-
-5. **Start application**:
-   ```bash
-   npm run start:dev
-   ```
-
-6. **Verify installation**:
-   - API: `http://localhost:3000`
-   - Swagger Docs: `http://localhost:3000/api/docs`
-   - Prisma Studio: `npm run prisma:studio`
+# 4. Start frontend (in new terminal)
+cd frontend
+npm run dev
+```
 
 ### **🧪 Testing Credentials**
 
