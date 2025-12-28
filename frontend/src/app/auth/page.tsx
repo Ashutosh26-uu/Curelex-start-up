@@ -72,7 +72,7 @@ export default function AuthPage() {
     if (!isValidIdentifier) return;
     
     try {
-      const response = await fetch('http://localhost:3000/api/v1/auth/check-user', {
+      const response = await fetch('http://localhost:3001/api/v1/auth/check-user', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ identifier }),
@@ -102,7 +102,7 @@ export default function AuthPage() {
     setLoading(true);
 
     try {
-      const response = await fetch('http://localhost:3000/api/v1/auth/unified', {
+      const response = await fetch('http://localhost:3001/api/v1/auth/unified', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -110,16 +110,6 @@ export default function AuthPage() {
           password,
           fullName: mode === 'signup' ? fullName : undefined,
           role: mode === 'signup' ? role : undefined,
-          email: mode === 'signup' ? email : undefined,
-          phone: mode === 'signup' ? `+91${phone}` : undefined,
-          dateOfBirth: mode === 'signup' ? dateOfBirth : undefined,
-          gender: mode === 'signup' ? gender : undefined,
-          address: mode === 'signup' ? address : undefined,
-          emergencyContact: mode === 'signup' ? `+91${emergencyContact}` : undefined,
-          specialization: mode === 'signup' && (role === 'DOCTOR' || role === 'JUNIOR_DOCTOR') ? specialization : undefined,
-          licenseNumber: mode === 'signup' && (role === 'DOCTOR' || role === 'JUNIOR_DOCTOR') ? licenseNumber : undefined,
-          aadharNumber: mode === 'signup' ? aadharNumber : undefined,
-          experience: mode === 'signup' && (role === 'DOCTOR' || role === 'JUNIOR_DOCTOR') ? experience : undefined,
           action: mode,
         }),
       });
@@ -172,6 +162,7 @@ export default function AuthPage() {
               width={48}
               height={48}
               className="w-12 h-12 rounded-lg"
+              priority
             />
             <h1 className="text-2xl font-bold text-gray-900">CureLex</h1>
           </div>
