@@ -50,19 +50,9 @@ export default function AuthPage() {
   const validateForm = () => {
     const errors: {[key: string]: string} = {};
     
-    if (mode === 'signup') {
-      if (!fullName.trim()) errors.fullName = 'Full name is required';
-      if (!isValidPhone) errors.phone = 'Valid 10-digit phone number required';
-      if (!email.includes('@')) errors.email = 'Valid email address required';
-      if (!dateOfBirth) errors.dateOfBirth = 'Date of birth is required';
-      if (!gender) errors.gender = 'Gender selection is required';
-      if (!address.trim()) errors.address = 'Address is required';
-      if (!emergencyContact || emergencyContact.length !== 10) errors.emergencyContact = 'Valid emergency contact required';
-      if (!aadharNumber || aadharNumber.length !== 12) errors.aadharNumber = 'Valid 12-digit Aadhar number required';
-    }
-    
     if (!password || password.length < 8) errors.password = 'Password must be at least 8 characters';
     if (mode === 'login' && !isValidIdentifier) errors.identifier = 'Valid email or phone number required';
+    if (mode === 'signup' && !fullName.trim()) errors.fullName = 'Full name is required';
     
     setValidationErrors(errors);
     return Object.keys(errors).length === 0;
@@ -102,6 +92,14 @@ export default function AuthPage() {
     setLoading(true);
 
     try {
+      console.log('Sending request:', {
+        identifier: mode === 'signup' ? `+91${phone}` : identifier,
+        password,
+        fullName: mode === 'signup' ? fullName : undefined,
+        role: mode === 'signup' ? role : undefined,
+        action: mode,
+      });
+      
       const response = await fetch('http://localhost:3001/api/v1/auth/unified', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -115,6 +113,7 @@ export default function AuthPage() {
       });
 
       const data = await response.json();
+      console.log('Response:', data);
 
       if (response.ok) {
         login(data.user, data.accessToken, data.refreshToken);
@@ -150,8 +149,6 @@ export default function AuthPage() {
           width={400}
           height={400}
           className="opacity-15 grayscale"
-          priority
-          style={{ width: 'auto', height: 'auto' }}
         />
       </div>
 
@@ -164,8 +161,6 @@ export default function AuthPage() {
               width={48}
               height={48}
               className="w-12 h-12 rounded-lg"
-              priority
-              style={{ width: 'auto', height: 'auto' }}
             />
             <h1 className="text-2xl font-bold text-gray-900">CureLex</h1>
           </div>
