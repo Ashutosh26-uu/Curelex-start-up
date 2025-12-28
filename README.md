@@ -179,38 +179,23 @@ A comprehensive NestJS healthcare platform with advanced patient care, AI-powere
 
 ## 🚀 Quick Start Guide
 
-### Option 1: Complete Setup (Recommended)
+### Option 1: Local Setup (Recommended)
 ```bash
-# Run the complete setup script
-start-complete.bat
+# Run the local setup script
+start-local.bat
 ```
 
-### Option 2: Backend Only
+### Option 2: Manual Setup
 ```bash
-# Run backend only setup
-start-backend-only.bat
-```
-
-### Option 3: Production Deployment
-```bash
-# Deploy in production mode
-deploy-production.bat
-```
-
-### Manual Setup
-```bash
-# 1. Start Docker services
-npm run docker:dev
-
-# 2. Setup database
+# 1. Setup database
 npm run prisma:migrate
 npm run prisma:generate
 npm run prisma:seed
 
-# 3. Start backend
+# 2. Start backend
 npm run start:dev
 
-# 4. Start frontend (in new terminal)
+# 3. Start frontend (in new terminal)
 cd frontend
 npm run dev
 ```
