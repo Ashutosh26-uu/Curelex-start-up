@@ -4,7 +4,7 @@ import { Response } from 'express';
 import { AuthService } from './auth.service';
 import { LoginDto, PatientLoginDto, DoctorLoginDto } from './dto/login.dto';
 import { PatientRegisterDto } from './dto/patient-register.dto';
-import { RegisterDto } from './dto/register.dto';
+
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
@@ -113,7 +113,7 @@ export class AuthController {
   @ApiOperation({ summary: 'User registration' })
   @Public()
   @Post('register')
-  async register(@Body() registerDto: RegisterDto) {
+  async register(@Body() registerDto: PatientRegisterDto) {
     return this.authService.register(registerDto);
   }
 

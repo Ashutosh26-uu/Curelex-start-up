@@ -6,7 +6,7 @@ import { PrismaService } from '../../common/prisma/prisma.service';
 import { CaptchaService } from '../../common/services/captcha.service';
 import { LoginDto, PatientLoginDto, DoctorLoginDto } from './dto/login.dto';
 import { PatientRegisterDto } from './dto/patient-register.dto';
-import { RegisterDto } from './dto/register.dto';
+
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
@@ -396,7 +396,7 @@ export class AuthService {
     });
   }
 
-  async register(registerDto: RegisterDto) {
+  async register(registerDto: PatientRegisterDto) {
     throw new BadRequestException('Please use role-specific registration endpoints');
   }
 
