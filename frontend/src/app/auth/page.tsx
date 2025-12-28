@@ -212,7 +212,7 @@ export default function AuthPage() {
                 placeholder="Enter email or phone number"
                 className="pl-10"
                 aria-required="true"
-                aria-invalid={validationErrors.identifier ? 'true' : 'false'}
+                aria-invalid={!!validationErrors.identifier}
                 aria-describedby={validationErrors.identifier ? `${identifierId}-error` : undefined}
                 autoComplete={isEmail ? 'email' : 'tel'}
                 required
@@ -281,7 +281,7 @@ export default function AuthPage() {
                   onChange={(e) => setFullName(e.target.value)}
                   placeholder="Enter your full name"
                   aria-required="true"
-                  aria-invalid={validationErrors.fullName ? 'true' : 'false'}
+                  aria-invalid={!!validationErrors.fullName}
                   aria-describedby={validationErrors.fullName ? 'fullName-error' : undefined}
                   autoComplete="name"
                   required
@@ -315,7 +315,7 @@ export default function AuthPage() {
                     placeholder="Enter 10-digit mobile number"
                     className="rounded-l-none"
                     aria-required="true"
-                    aria-invalid={validationErrors.phone || (phone && !isValidPhone) ? 'true' : 'false'}
+                    aria-invalid={!!(validationErrors.phone || (phone && !isValidPhone))}
                     aria-describedby={validationErrors.phone || (phone && !isValidPhone) ? 'phone-error' : undefined}
                     autoComplete="tel"
                     maxLength={10}
@@ -340,7 +340,7 @@ export default function AuthPage() {
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="Enter your email address"
                   aria-required="true"
-                  aria-invalid={validationErrors.email ? 'true' : 'false'}
+                  aria-invalid={!!validationErrors.email}
                   aria-describedby={validationErrors.email ? 'email-error' : undefined}
                   autoComplete="email"
                   required
