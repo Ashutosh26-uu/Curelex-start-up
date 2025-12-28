@@ -28,7 +28,7 @@ model User {
   emailVerifiedAt  DateTime?
   twoFactorEnabled Boolean   @default(false)
   twoFactorSecret  String?
-  backupCodes      String[]
+  backupCodes      String?
   sessionId        String?
   ipAddress        String?
   userAgent        String?
