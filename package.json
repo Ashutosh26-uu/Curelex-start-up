@@ -18,7 +18,7 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
-    "prisma:seed": "node prisma/simple-seed.js",
+    "prisma:seed": "node prisma/comprehensive-seed.js",
     "prisma:reset": "prisma migrate reset --force",
     "db:setup": "npm run prisma:migrate && npm run prisma:seed",
     "dev:setup": "npm run docker:dev && sleep 5 && npm run db:setup && npm run start:dev",
@@ -66,7 +66,7 @@
     "uuid": "^9.0.1"
   },
   "prisma": {
-    "seed": "node prisma/simple-seed.js"
+    "seed": "node prisma/comprehensive-seed.js"
   },
   "devDependencies": {
     "@nestjs/cli": "^10.0.0",
