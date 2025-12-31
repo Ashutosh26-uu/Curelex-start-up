@@ -372,7 +372,7 @@ export default function AuthPage() {
                     onChange={(e) => setGender(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
                     aria-required="true"
-                    aria-invalid={validationErrors.gender ? 'true' : 'false'}
+                    aria-invalid={!!validationErrors.gender}
                     aria-describedby={validationErrors.gender ? 'gender-error' : undefined}
                     required
                   >
