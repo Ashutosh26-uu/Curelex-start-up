@@ -16,6 +16,12 @@ export const metadata: Metadata = {
   keywords: 'healthcare, telemedicine, patient portal, doctor dashboard, medical records, accessibility, WCAG compliant',
   authors: [{ name: 'CureLex Healthcare Platform Team' }],
   robots: 'index, follow',
+  icons: {
+    icon: '/favicon.ico',
+    shortcut: '/favicon.ico',
+    apple: '/apple-touch-icon.png',
+  },
+  manifest: '/manifest.json',
   openGraph: {
     title: 'CureLex - Healthcare Telemedicine Platform',
     description: 'Secure, accessible healthcare platform for patients and providers',
@@ -39,7 +45,6 @@ export default function RootLayout({
         <meta charSet="utf-8" />
         <meta name="theme-color" content="#2563eb" />
         <meta name="color-scheme" content="light" />
-        <link rel="icon" href="/favicon.ico" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
       </head>

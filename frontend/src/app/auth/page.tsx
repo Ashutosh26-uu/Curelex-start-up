@@ -2,10 +2,10 @@
 
 import { useState, useId } from 'react';
 import { useRouter } from 'next/navigation';
-import Image from 'next/image';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Card } from '@/components/ui/Card';
+import { OptimizedImage } from '@/components/ui/OptimizedImage';
 import { useAuthStore } from '@/store/auth';
 import { Eye, EyeOff, Mail, Phone, User, Lock, Heart, AlertCircle } from 'lucide-react';
 
@@ -143,24 +143,27 @@ export default function AuthPage() {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4 relative">
       {/* Background Logo */}
       <div className="fixed inset-0 flex items-center justify-center pointer-events-none z-0" aria-hidden="true">
-        <Image
+        <OptimizedImage
           src="/images/crelex.jpg"
           alt=""
           width={400}
           height={400}
           className="opacity-15 grayscale"
+          loading="lazy"
+          priority={false}
         />
       </div>
 
       <Card className="w-full max-w-md p-8 space-y-6 relative z-10 bg-white/95 backdrop-blur-sm shadow-xl">
         <header className="text-center space-y-2">
           <div className="flex items-center justify-center space-x-3">
-            <Image
+            <OptimizedImage
               src="/images/crelex.jpg"
               alt="CureLex Healthcare Platform Logo"
               width={48}
               height={48}
               className="w-12 h-12 rounded-lg"
+              priority={true}
             />
             <h1 className="text-2xl font-bold text-gray-900">CureLex</h1>
           </div>

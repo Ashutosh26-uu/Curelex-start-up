@@ -101,13 +101,13 @@ export default function HomePage() {
             
             <div className="flex items-center gap-4">
               <Link
-                href="/auth?role=patient"
+                href="/auth"
                 className="text-gray-600 hover:text-gray-900 font-medium"
               >
                 Patient Login
               </Link>
               <Link
-                href="/auth?role=doctor"
+                href="/auth"
                 className="text-gray-600 hover:text-gray-900 font-medium"
               >
                 Doctor Login
