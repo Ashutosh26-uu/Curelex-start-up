@@ -154,7 +154,7 @@ export default function AuthPage() {
         />
       </div>
 
-      <Card className="w-full max-w-md p-8 space-y-6 relative z-10 bg-white/95 backdrop-blur-sm shadow-xl">
+      <Card className="w-full max-w-md mx-auto p-6 sm:p-8 space-y-6 relative z-10 bg-white/95 backdrop-blur-sm shadow-xl">
         <header className="text-center space-y-2">
           <div className="flex items-center justify-center space-x-3">
             <OptimizedImage
@@ -162,12 +162,12 @@ export default function AuthPage() {
               alt="CureLex Healthcare Platform Logo"
               width={48}
               height={48}
-              className="w-12 h-12 rounded-lg"
+              className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg"
               priority={true}
             />
-            <h1 className="text-2xl font-bold text-gray-900">CureLex</h1>
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900">CureLex</h1>
           </div>
-          <p className="text-gray-700 text-base">
+          <p className="text-gray-700 text-sm sm:text-base">
             {mode === 'login' ? 'Welcome back to your healthcare dashboard' : 'Join our secure healthcare community'}
           </p>
         </header>

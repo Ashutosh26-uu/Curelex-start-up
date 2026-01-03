@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { UserRole } from '@/types';
 import { useQuery } from '@tanstack/react-query';
-import { doctorApi } from '@/lib/api';
+import { apiHelpers } from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
 import { getInitials } from '@/lib/utils';
 import { Users, Phone, Mail, FileText } from 'lucide-react';
@@ -16,7 +16,7 @@ export default function DoctorPatients() {
 
   const { data: patients } = useQuery({
     queryKey: ['doctor', 'patients', user?.doctor?.id],
-    queryFn: () => doctorApi.getPatients(user?.doctor?.id || ''),
+    queryFn: () => apiHelpers.patients.getProfile(),
     enabled: !!user?.doctor?.id,
   });
 

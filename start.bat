@@ -1,24 +1,26 @@
 @echo off
 echo ========================================
-echo Healthcare Platform - SQLite Setup
+echo CureLex Healthcare Platform
 echo ========================================
 
-echo 1. Installing dependencies...
+echo 1. Installing backend dependencies...
 call npm install
 
-echo 2. Generating Prisma client...
+echo 2. Setting up SQLite database...
 call npx prisma generate
-
-echo 3. Running migrations...
 call npx prisma migrate dev --name init
-
-echo 4. Seeding database...
 call npm run prisma:seed
 
-echo 5. Starting backend...
+echo 3. Installing frontend dependencies...
+cd frontend
+call npm install
+cd ..
+
+echo 4. Starting services...
 start "Backend" cmd /k "echo Backend: http://localhost:3001 && npm run start:dev"
 
-echo 6. Starting frontend...
+timeout /t 5 /nobreak > nul
+
 start "Frontend" cmd /k "echo Frontend: http://localhost:3002 && cd frontend && npm run dev"
 
 echo ========================================
@@ -27,6 +29,17 @@ echo ========================================
 echo 🌐 Frontend: http://localhost:3002
 echo 🔧 Backend API: http://localhost:3001/api/v1
 echo 📚 API Docs: http://localhost:3001/api/docs
+echo 📊 Database: SQLite (./prisma/dev.db)
+echo ========================================
+echo 🔐 Test Credentials:
+echo 👨💼 Admin: ashutosh@curelex.com / admin@123
+echo 👨⚕️ Doctor: doctor@healthcare.com / doctor123
+echo 👤 Patient: patient@healthcare.com / patient123
+echo ========================================
+echo 📱 Mobile Responsive: ✅
+echo 🔐 Authentication: ✅
+echo 👥 Patient Dashboard: ✅
+echo 👨⚕️ Doctor Dashboard: ✅
 echo ========================================
 
 pause

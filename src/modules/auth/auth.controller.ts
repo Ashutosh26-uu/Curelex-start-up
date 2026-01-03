@@ -317,8 +317,12 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @Post('social')
   async socialLogin(@Body() socialLoginDto: SocialLoginDto) {
-    const user = await this.socialAuthService.validateSocialLogin(socialLoginDto);
-    return this.authService.generateTokens(user.id, user.email, user.role, 'social-login');
+    try {
+      const user = await this.socialAuthService.validateSocialLogin(socialLoginDto);
+      return this.authService.generateTokens(user.id, user.email, user.role, 'social-login');
+    } catch (error) {
+      throw error;
+    }
   }
 
   @ApiOperation({ summary: 'Check if user exists by email or phone' })

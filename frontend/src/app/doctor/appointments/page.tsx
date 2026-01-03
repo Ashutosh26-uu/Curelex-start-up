@@ -8,9 +8,8 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { Select } from '@/components/ui/Select';
 import { UserRole } from '@/types';
-import { appointmentApi, doctorApi } from '@/lib/api';
+import { apiHelpers } from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
 import { Calendar, Clock, Video, Users } from 'lucide-react';
 
@@ -28,17 +27,17 @@ export default function DoctorAppointments() {
 
   const { data: appointments, refetch } = useQuery({
     queryKey: ['appointments', 'upcoming'],
-    queryFn: () => appointmentApi.getUpcoming(),
+    queryFn: () => apiHelpers.appointments.getUpcoming(),
   });
 
   const { data: patients } = useQuery({
     queryKey: ['doctor', 'patients', user?.doctor?.id],
-    queryFn: () => doctorApi.getPatients(user?.doctor?.id || ''),
+    queryFn: () => apiHelpers.patients.getProfile(),
     enabled: !!user?.doctor?.id,
   });
 
   const createAppointmentMutation = useMutation({
-    mutationFn: appointmentApi.create,
+    mutationFn: apiHelpers.appointments.create,
     onSuccess: () => {
       reset();
       setShowForm(false);
@@ -74,18 +73,25 @@ export default function DoctorAppointments() {
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-                  <Select
-                    label="Patient"
-                    options={[
-                      { value: '', label: 'Select Patient' },
-                      ...(patients?.data?.map((assignment: any) => ({
-                        value: assignment.patient.id,
-                        label: `${assignment.patient.user.profile.firstName} ${assignment.patient.user.profile.lastName}`
-                      })) || [])
-                    ]}
-                    {...register('patientId', { required: 'Patient is required' })}
-                    error={errors.patientId?.message}
-                  />
+                  <div>
+                    <label className="text-sm font-medium text-gray-700 block mb-2">
+                      Patient *
+                    </label>
+                    <select
+                      {...register('patientId', { required: 'Patient is required' })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
+                    >
+                      <option value="">Select Patient</option>
+                      {patients?.data?.map((assignment: any) => (
+                        <option key={assignment.patient.id} value={assignment.patient.id}>
+                          {assignment.patient.user.profile.firstName} {assignment.patient.user.profile.lastName}
+                        </option>
+                      ))}
+                    </select>
+                    {errors.patientId && (
+                      <p className="text-sm text-red-600">{errors.patientId.message}</p>
+                    )}
+                  </div>
 
                   <div className="grid grid-cols-2 gap-4">
                     <Input
@@ -95,17 +101,23 @@ export default function DoctorAppointments() {
                       error={errors.scheduledAt?.message}
                     />
 
-                    <Select
-                      label="Duration"
-                      options={[
-                        { value: '15', label: '15 minutes' },
-                        { value: '30', label: '30 minutes' },
-                        { value: '45', label: '45 minutes' },
-                        { value: '60', label: '1 hour' }
-                      ]}
-                      {...register('duration', { required: 'Duration is required' })}
-                      error={errors.duration?.message}
-                    />
+                    <div>
+                      <label className="text-sm font-medium text-gray-700 block mb-2">
+                        Duration *
+                      </label>
+                      <select
+                        {...register('duration', { required: 'Duration is required' })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
+                      >
+                        <option value="15">15 minutes</option>
+                        <option value="30">30 minutes</option>
+                        <option value="45">45 minutes</option>
+                        <option value="60">1 hour</option>
+                      </select>
+                      {errors.duration && (
+                        <p className="text-sm text-red-600">{errors.duration.message}</p>
+                      )}
+                    </div>
                   </div>
 
                   <Input
@@ -127,7 +139,7 @@ export default function DoctorAppointments() {
           )}
 
           <div className="grid gap-6">
-            {appointments?.data?.length > 0 ? (
+            {appointments?.data && appointments.data.length > 0 ? (
               appointments.data.map((appointment: any) => (
                 <Card key={appointment.id}>
                   <CardContent className="p-6">
@@ -162,12 +174,15 @@ export default function DoctorAppointments() {
                       </div>
                       <div className="flex items-center space-x-3">
                         {appointment.meetLink && (
-                          <Button size="sm" variant="outline" asChild>
-                            <a href={appointment.meetLink} target="_blank" rel="noopener noreferrer">
-                              <Video className="h-4 w-4 mr-2" />
-                              Join Meeting
-                            </a>
-                          </Button>
+                          <a 
+                            href={appointment.meetLink} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          >
+                            <Video className="h-4 w-4 mr-2" />
+                            Join Meeting
+                          </a>
                         )}
                         <Button size="sm">
                           View Details

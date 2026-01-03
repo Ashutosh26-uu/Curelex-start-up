@@ -118,7 +118,123 @@ export class AuthService {
   }
 
   async patientLogin(loginDto: PatientLoginDto, ipAddress?: string, userAgent?: string) {
-    return this.login({ ...loginDto, expectedRole: UserRole.PATIENT }, ipAddress, userAgent);
+    // Handle both email and phone login
+    let user;
+    
+    if (loginDto.email) {
+      user = await this.prisma.user.findUnique({
+        where: { email: loginDto.email.toLowerCase() },
+        include: {
+          profile: true,
+          patient: true,
+          doctor: true,
+          officer: true,
+        }
+      });
+    } else if (loginDto.phone) {
+      user = await this.prisma.user.findFirst({
+        where: { 
+          profile: { phone: loginDto.phone },
+          role: UserRole.PATIENT 
+        },
+        include: {
+          profile: true,
+          patient: true,
+          doctor: true,
+          officer: true,
+        }
+      });
+    } else {
+      throw new BadRequestException('Email or phone number is required');
+    }
+
+    if (!user) {
+      await this.logFailedLogin(loginDto.email || loginDto.phone, 'User not found', ipAddress, userAgent);
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    // Check if user is active
+    if (!user.isActive) {
+      await this.logFailedLogin(user.email, 'Account inactive', ipAddress, userAgent);
+      throw new UnauthorizedException('Account is inactive. Please contact support.');
+    }
+
+    // Check if account is locked
+    if (user.isLocked) {
+      await this.logFailedLogin(user.email, 'Account locked', ipAddress, userAgent);
+      throw new UnauthorizedException(`Account is locked. Reason: ${user.lockReason || 'Security violation'}`);
+    }
+
+    // Verify password
+    const isPasswordValid = await bcrypt.compare(loginDto.password, user.password);
+    if (!isPasswordValid) {
+      await this.handleFailedLogin(user.id, user.email, ipAddress, userAgent);
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    // Check role
+    if (user.role !== UserRole.PATIENT) {
+      await this.logFailedLogin(user.email, 'Invalid role access', ipAddress, userAgent);
+      throw new ForbiddenException('Access denied. This login is for patients only.');
+    }
+
+    // Generate session and tokens
+    const sessionId = uuidv4();
+    const tokens = await this.generateTokens(user.id, user.email, user.role, sessionId);
+
+    // Update user login info
+    await this.prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: user.id },
+        data: {
+          failedLoginAttempts: 0,
+          lastFailedLoginAt: null,
+          lastLoginAt: new Date(),
+          loginCount: { increment: 1 },
+          sessionId,
+          ipAddress,
+          userAgent,
+        }
+      });
+
+      await tx.userSession.create({
+        data: {
+          userId: user.id,
+          sessionId,
+          ipAddress,
+          userAgent,
+          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        }
+      });
+
+      await tx.loginHistory.create({
+        data: {
+          userId: user.id,
+          email: user.email,
+          success: true,
+          ipAddress,
+          userAgent,
+        }
+      });
+    });
+
+    this.logger.log(`Successful patient login: ${user.email}`);
+
+    const userData = {
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      profile: user.profile,
+      patient: user.patient,
+    };
+
+    return {
+      success: true,
+      message: 'Login successful',
+      user: userData,
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+    };
   }
 
   async doctorLogin(loginDto: DoctorLoginDto, ipAddress?: string, userAgent?: string) {
