@@ -22,7 +22,7 @@ export function RoleGuard({
 
   useEffect(() => {
     if (!isAuthenticated || !user) {
-      router.push('/patient-login');
+      router.push('/auth');
       return;
     }
 

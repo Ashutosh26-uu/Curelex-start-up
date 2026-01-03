@@ -9,7 +9,7 @@ interface AuthGuardProps {
   redirectTo?: string;
 }
 
-export function AuthGuard({ children, redirectTo = '/patient-login' }: AuthGuardProps) {
+export function AuthGuard({ children, redirectTo = '/auth' }: AuthGuardProps) {
   const router = useRouter();
   const { isAuthenticated, user, setLoading, clearAuth } = useAuthStore();
   const [isChecking, setIsChecking] = useState(true);

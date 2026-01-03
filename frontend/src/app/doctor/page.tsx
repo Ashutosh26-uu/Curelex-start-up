@@ -5,7 +5,7 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { UserRole } from '@/types';
 import { useQuery } from '@tanstack/react-query';
-import { appointmentApi, doctorApi } from '@/lib/api';
+import { apiHelpers } from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
 import { Users, Calendar, FileText, Clock } from 'lucide-react';
 
@@ -14,12 +14,12 @@ export default function DoctorDashboard() {
 
   const { data: appointments } = useQuery({
     queryKey: ['appointments', 'upcoming'],
-    queryFn: () => appointmentApi.getUpcoming(),
+    queryFn: () => apiHelpers.appointments.getUpcoming(),
   });
 
   const { data: patients } = useQuery({
     queryKey: ['doctor', 'patients', user?.doctor?.id],
-    queryFn: () => doctorApi.getPatients(user?.doctor?.id || ''),
+    queryFn: () => apiHelpers.patients.getProfile(),
     enabled: !!user?.doctor?.id,
   });
 

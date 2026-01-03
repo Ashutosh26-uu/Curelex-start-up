@@ -22,7 +22,6 @@ export const metadata: Metadata = {
     apple: '/apple-touch-icon.png',
   },
   manifest: '/manifest.json',
-  themeColor: '#2563eb',
   openGraph: {
     title: 'CureLex - Healthcare Telemedicine Platform',
     description: 'Secure, accessible healthcare platform for patients and providers',
@@ -33,6 +32,7 @@ export const metadata: Metadata = {
 export const viewport = {
   width: 'device-width',
   initialScale: 1,
+  themeColor: '#2563eb',
 };
 
 export default function RootLayout({
