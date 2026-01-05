@@ -11,6 +11,8 @@ import { GlobalExceptionFilter } from './common/filters/global-exception.filter'
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
 import { ErrorHandlingService } from './common/services/error-handling.service';
+import { ResourceManagementService } from './common/services/resource-management.service';
+import { EnhancedRateLimitGuard } from './common/guards/enhanced-rate-limit.guard';
 import { validateConstants } from './common/constants/app.constants';
 
 import { AppController } from './app.controller';
@@ -36,7 +38,7 @@ const globalProviders = [
   { provide: APP_GUARD, useClass: JwtAuthGuard },
   { provide: APP_GUARD, useClass: RolesGuard },
   { provide: APP_GUARD, useClass: CsrfGuard },
-  { provide: APP_GUARD, useClass: ThrottlerGuard },
+  { provide: APP_GUARD, useClass: EnhancedRateLimitGuard },
   { 
     provide: APP_FILTER, 
     useFactory: (errorHandlingService: ErrorHandlingService) => new GlobalExceptionFilter(errorHandlingService),
@@ -45,6 +47,7 @@ const globalProviders = [
   { provide: APP_INTERCEPTOR, useClass: LoggingInterceptor },
   { provide: APP_INTERCEPTOR, useClass: ResponseInterceptor },
   ErrorHandlingService,
+  ResourceManagementService,
 ];
 
 const createCoreModules = () => {

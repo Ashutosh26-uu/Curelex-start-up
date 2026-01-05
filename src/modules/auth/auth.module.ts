@@ -11,6 +11,9 @@ import { TokenBlacklistService } from '../../common/services/token-blacklist.ser
 import { AuthValidationService } from '../../common/services/auth-validation.service';
 import { BusinessLogicService } from '../../common/services/business-logic.service';
 import { ServiceRegistry } from '../../common/services/service-registry.service';
+import { QueryOptimizationService } from '../../common/services/query-optimization.service';
+import { CacheService } from '../../common/services/cache.service';
+import { ResourceManagementService } from '../../common/services/resource-management.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { LocalStrategy } from './strategies/local.strategy';
 import { PrismaModule } from '../../common/prisma/prisma.module';
@@ -48,6 +51,9 @@ import { NotificationModule } from '../notification/notification.module';
     ErrorHandlingService,
     BusinessLogicService,
     ServiceRegistry,
+    QueryOptimizationService,
+    CacheService,
+    ResourceManagementService,
     JwtStrategy, 
     LocalStrategy,
   ],

@@ -6,6 +6,7 @@ import { DatabaseService } from '../../common/database/database.service';
 import { AuthValidationService } from '../../common/services/auth-validation.service';
 import { ErrorHandlingService } from '../../common/services/error-handling.service';
 import { BusinessLogicService } from '../../common/services/business-logic.service';
+import { QueryOptimizationService } from '../../common/services/query-optimization.service';
 import { IAuthService, INotificationService } from '../../common/interfaces/service.interfaces';
 import { ServiceRegistry } from '../../common/services/service-registry.service';
 import { ValidationUtils } from '../../common/utils/validation.utils';
@@ -30,19 +31,17 @@ export class AuthService implements IAuthService {
     private errorHandlingService: ErrorHandlingService,
     private businessLogicService: BusinessLogicService,
     private serviceRegistry: ServiceRegistry,
+    private queryOptimizationService: QueryOptimizationService,
   ) {
     // Register this service to prevent circular dependencies
     this.serviceRegistry.registerService(ServiceRegistry.AUTH_SERVICE, this);
   }
 
   async validateUser(email: string, password: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { email: email.toLowerCase() },
-      include: { profile: true, patient: true, doctor: true, officer: true },
-    });
+    const user = await this.queryOptimizationService.findUserWithProfile(email);
 
     if (user && await bcrypt.compare(password, user.password)) {
-      const { password, ...result } = user;
+      const { password: _, ...result } = user;
       return result;
     }
     return null;
@@ -156,21 +155,12 @@ export class AuthService implements IAuthService {
       loginDto.password
     );
 
-    // Find user by email or phone
+    // Optimized user lookup
     let user;
     if (loginDto.email) {
-      user = await this.prisma.user.findUnique({
-        where: { email: loginDto.email.toLowerCase() },
-        include: { profile: true, patient: true, doctor: true, officer: true }
-      });
+      user = await this.queryOptimizationService.findUserWithProfile(loginDto.email);
     } else if (normalizedPhone) {
-      user = await this.prisma.user.findFirst({
-        where: { 
-          profile: { phone: normalizedPhone },
-          role: UserRole.PATIENT 
-        },
-        include: { profile: true, patient: true, doctor: true, officer: true }
-      });
+      user = await this.queryOptimizationService.findUserByPhone(normalizedPhone, UserRole.PATIENT);
     }
 
     if (!user) {
@@ -284,11 +274,8 @@ export class AuthService implements IAuthService {
       // Centralized validation
       this.authValidationService.validateLoginCredentials(loginDto.email, undefined, loginDto.password);
 
-      // Find user
-      const user = await this.prisma.user.findUnique({
-        where: { email: loginDto.email.toLowerCase() },
-        include: { profile: true, patient: true, doctor: true, officer: true }
-      });
+      // Optimized user lookup with caching
+      const user = await this.queryOptimizationService.findUserWithProfile(loginDto.email);
 
       if (!user) {
         await this.logFailedLogin(loginDto.email, 'User not found', ipAddress, userAgent);
@@ -381,7 +368,7 @@ export class AuthService implements IAuthService {
         await tokenBlacklistService.blacklistToken(jti, userId, 'logout');
       }
 
-      // Clear refresh token
+      // Clear refresh token and session
       await tx.user.update({
         where: { id: userId },
         data: { 
@@ -391,12 +378,24 @@ export class AuthService implements IAuthService {
         }
       });
 
-      // Deactivate session
+      // Deactivate current session instead of keeping it
       await tx.userSession.updateMany({
         where: { userId, sessionId },
         data: { isActive: false }
       });
+
+      // Clean up old inactive sessions for this user
+      await tx.userSession.deleteMany({
+        where: {
+          userId,
+          isActive: false,
+          createdAt: { lt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } // 7 days old
+        }
+      });
     });
+
+    // Invalidate user cache
+    await this.queryOptimizationService.invalidateUserCache(userId);
 
     return { success: true, message: 'Logout successful' };
   }
@@ -412,11 +411,14 @@ export class AuthService implements IAuthService {
         }
       });
 
-      await tx.userSession.updateMany({
-        where: { userId },
-        data: { isActive: false }
+      // Delete all sessions for this user instead of just deactivating
+      await tx.userSession.deleteMany({
+        where: { userId }
       });
     });
+
+    // Invalidate user cache
+    await this.queryOptimizationService.invalidateUserCache(userId);
 
     return { success: true, message: 'Logged out from all sessions' };
   }
@@ -449,6 +451,25 @@ export class AuthService implements IAuthService {
 
   private async logFailedLogin(email: string, reason: string, ipAddress?: string, userAgent?: string) {
     try {
+      // Limit login history per user to prevent unlimited growth
+      const existingCount = await this.prisma.loginHistory.count({
+        where: { email }
+      });
+
+      if (existingCount >= 100) {
+        // Delete oldest records, keep latest 50
+        const oldestRecords = await this.prisma.loginHistory.findMany({
+          where: { email },
+          orderBy: { createdAt: 'asc' },
+          take: existingCount - 50,
+          select: { id: true }
+        });
+
+        await this.prisma.loginHistory.deleteMany({
+          where: { id: { in: oldestRecords.map(r => r.id) } }
+        });
+      }
+
       await this.prisma.loginHistory.create({
         data: {
           email,
@@ -569,41 +590,16 @@ export class AuthService implements IAuthService {
     const sessionId = uuidv4();
     const tokens = await this.generateTokens(user.id, user.email, user.role, sessionId);
 
-    // Update user login info
-    await this.prisma.safeTransaction(async (tx) => {
-      await tx.user.update({
-        where: { id: user.id },
-        data: {
-          failedLoginAttempts: 0,
-          lastFailedLoginAt: null,
-          lastLoginAt: new Date(),
-          loginCount: { increment: 1 },
-          sessionId,
-          ipAddress,
-          userAgent,
-        }
-      });
+    // Optimized batch update for login info
+    const sessionData = {
+      sessionId,
+      ipAddress,
+      userAgent,
+      email: user.email,
+      expiresAt: new Date(Date.now() + (rememberMe ? 30 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000)),
+    };
 
-      await tx.userSession.create({
-        data: {
-          userId: user.id,
-          sessionId,
-          ipAddress,
-          userAgent,
-          expiresAt: new Date(Date.now() + (rememberMe ? 30 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000)),
-        }
-      });
-
-      await tx.loginHistory.create({
-        data: {
-          userId: user.id,
-          email: user.email,
-          success: true,
-          ipAddress,
-          userAgent,
-        }
-      });
-    });
+    await this.queryOptimizationService.updateUserLoginBatch(user.id, sessionData);
 
     this.logger.log(`Successful login: ${user.email} (${user.role})`);
 
