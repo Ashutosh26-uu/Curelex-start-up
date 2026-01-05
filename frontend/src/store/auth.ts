@@ -35,10 +35,11 @@ interface AuthState {
   refreshToken: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  sessionId: string | null;
 }
 
 interface AuthActions {
-  login: (user: User, accessToken: string, refreshToken: string) => void;
+  login: (user: User, accessToken: string, refreshToken: string, sessionId?: string) => void;
   logout: () => void;
   updateUser: (user: Partial<User>) => void;
   updateTokens: (accessToken: string, refreshToken: string) => void;
@@ -52,6 +53,13 @@ const initialState: AuthState = {
   refreshToken: null,
   isAuthenticated: false,
   isLoading: false,
+  sessionId: null,
+};
+
+const COOKIE_OPTIONS = {
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: 'strict' as const,
+  httpOnly: false, // Client needs access for API calls
 };
 
 export const useAuthStore = create<AuthState & AuthActions>()(
@@ -59,75 +67,71 @@ export const useAuthStore = create<AuthState & AuthActions>()(
     (set, get) => ({
       ...initialState,
 
-      login: (user: User, accessToken: string, refreshToken: string) => {
-        // Store tokens in cookies for security
+      login: (user: User, accessToken: string, refreshToken: string, sessionId?: string) => {
+        // Store tokens in secure cookies
         Cookies.set('access_token', accessToken, { 
-          expires: 1, // 1 day
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'strict'
+          expires: 1/24, // 1 hour
+          ...COOKIE_OPTIONS
         });
         
         Cookies.set('refresh_token', refreshToken, { 
           expires: 7, // 7 days
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'strict'
+          ...COOKIE_OPTIONS
         });
+
+        if (sessionId) {
+          Cookies.set('session_id', sessionId, {
+            expires: 7,
+            ...COOKIE_OPTIONS
+          });
+        }
 
         set({
           user,
           accessToken,
           refreshToken,
+          sessionId,
           isAuthenticated: true,
           isLoading: false,
         });
       },
 
       logout: () => {
-        // Clear cookies
-        Cookies.remove('access_token');
-        Cookies.remove('refresh_token');
-        
-        set({
-          ...initialState,
+        // Clear all auth cookies
+        ['access_token', 'refresh_token', 'session_id'].forEach(cookie => {
+          Cookies.remove(cookie, { path: '/' });
         });
+        
+        set({ ...initialState });
       },
 
       updateUser: (userData: Partial<User>) => {
         const currentUser = get().user;
         if (currentUser) {
-          set({
-            user: { ...currentUser, ...userData },
-          });
+          set({ user: { ...currentUser, ...userData } });
         }
       },
 
       updateTokens: (accessToken: string, refreshToken: string) => {
-        // Update cookies
         Cookies.set('access_token', accessToken, { 
-          expires: 1,
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'strict'
+          expires: 1/24,
+          ...COOKIE_OPTIONS
         });
         
         Cookies.set('refresh_token', refreshToken, { 
           expires: 7,
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'strict'
+          ...COOKIE_OPTIONS
         });
 
-        set({
-          accessToken,
-          refreshToken,
-        });
+        set({ accessToken, refreshToken });
       },
 
-      setLoading: (loading: boolean) => {
-        set({ isLoading: loading });
-      },
+      setLoading: (loading: boolean) => set({ isLoading: loading }),
 
       clearAuth: () => {
-        Cookies.remove('access_token');
-        Cookies.remove('refresh_token');
+        ['access_token', 'refresh_token', 'session_id'].forEach(cookie => {
+          Cookies.remove(cookie, { path: '/' });
+        });
         set({ ...initialState });
       },
     }),
@@ -136,36 +140,53 @@ export const useAuthStore = create<AuthState & AuthActions>()(
       partialize: (state) => ({
         user: state.user,
         isAuthenticated: state.isAuthenticated,
+        sessionId: state.sessionId,
       }),
     }
   )
 );
 
 // Helper functions
-export const getStoredTokens = () => {
-  return {
-    accessToken: Cookies.get('access_token'),
-    refreshToken: Cookies.get('refresh_token'),
-  };
-};
+export const getStoredTokens = () => ({
+  accessToken: Cookies.get('access_token'),
+  refreshToken: Cookies.get('refresh_token'),
+  sessionId: Cookies.get('session_id'),
+});
 
 export const isTokenExpired = (token: string): boolean => {
   try {
     const payload = JSON.parse(atob(token.split('.')[1]));
-    return payload.exp * 1000 < Date.now();
+    return payload.exp * 1000 < Date.now() + 60000; // 1 minute buffer
   } catch {
     return true;
   }
 };
 
-// Auto-logout on token expiry
+// Enhanced token validation
 if (typeof window !== 'undefined') {
-  setInterval(() => {
-    const { accessToken } = getStoredTokens();
-    const { isAuthenticated, logout } = useAuthStore.getState();
-    
-    if (isAuthenticated && accessToken && isTokenExpired(accessToken)) {
-      logout();
+  let tokenCheckInterval: NodeJS.Timeout;
+  
+  const startTokenMonitoring = () => {
+    tokenCheckInterval = setInterval(() => {
+      const { accessToken } = getStoredTokens();
+      const { isAuthenticated, logout } = useAuthStore.getState();
+      
+      if (isAuthenticated && accessToken && isTokenExpired(accessToken)) {
+        logout();
+      }
+    }, 30000); // Check every 30 seconds
+  };
+  
+  const stopTokenMonitoring = () => {
+    if (tokenCheckInterval) clearInterval(tokenCheckInterval);
+  };
+  
+  // Start monitoring when authenticated
+  useAuthStore.subscribe((state) => {
+    if (state.isAuthenticated) {
+      startTokenMonitoring();
+    } else {
+      stopTokenMonitoring();
     }
-  }, 60000); // Check every minute
+  });
 }

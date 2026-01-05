@@ -21,7 +21,10 @@ import { ResourceManagementService } from '../../common/services/resource-manage
 import { ErrorHandlingService } from '../../common/services/error-handling.service';
 import { EnhancedCSRFGuard } from './guards/enhanced-csrf.guard';
 import { JwtStrategy } from './strategies/jwt.strategy';
+import { JwtRefreshStrategy } from './strategies/jwt-refresh.strategy';
 import { LocalStrategy } from './strategies/local.strategy';
+import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { JwtRefreshGuard } from './guards/jwt-refresh.guard';
 import { PrismaModule } from '../../common/prisma/prisma.module';
 import { NotificationModule } from '../notification/notification.module';
 import { JwtConfigService } from '../../config/jwt.config';
@@ -66,8 +69,11 @@ import { JwtConfigService } from '../../config/jwt.config';
     CacheService,
     ResourceManagementService,
     EnhancedCSRFGuard,
-    JwtStrategy, 
+    JwtStrategy,
+    JwtRefreshStrategy,
     LocalStrategy,
+    JwtAuthGuard,
+    JwtRefreshGuard,
   ],
   exports: [
     AuthService, 
@@ -76,6 +82,8 @@ import { JwtConfigService } from '../../config/jwt.config';
     SessionManagementService,
     AuditLoggingService,
     TokenBlacklistService,
+    JwtAuthGuard,
+    JwtRefreshGuard,
     EnhancedCSRFGuard
   ],
 })
