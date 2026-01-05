@@ -1,22 +1,24 @@
-import React from 'react';
+import React, { forwardRef } from 'react';
 import { cn } from '@/lib/utils';
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'default' | 'outline' | 'ghost' | 'danger';
+  variant?: 'default' | 'outline' | 'ghost' | 'danger' | 'success';
   size?: 'sm' | 'md' | 'lg';
   loading?: boolean;
   children: React.ReactNode;
   ariaLabel?: string;
   ariaDescribedBy?: string;
+  fullWidth?: boolean;
 }
 
-const baseStyles = 'inline-flex items-center justify-center rounded-md font-medium transition-colors focus:outline-none focus:ring-4 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]';
+const baseStyles = 'inline-flex items-center justify-center rounded-md font-medium transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] relative overflow-hidden';
 
 const variants = {
-  default: 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-300',
-  outline: 'border-2 border-gray-300 bg-white text-gray-700 hover:bg-gray-50 focus:ring-gray-300',
-  ghost: 'text-gray-700 hover:bg-gray-100 focus:ring-gray-300',
-  danger: 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-300',
+  default: 'bg-blue-600 text-white hover:bg-blue-700 active:bg-blue-800 focus:ring-blue-300 shadow-sm hover:shadow-md',
+  outline: 'border-2 border-gray-300 bg-white text-gray-700 hover:bg-gray-50 active:bg-gray-100 focus:ring-gray-300 shadow-sm hover:shadow-md',
+  ghost: 'text-gray-700 hover:bg-gray-100 active:bg-gray-200 focus:ring-gray-300',
+  danger: 'bg-red-600 text-white hover:bg-red-700 active:bg-red-800 focus:ring-red-300 shadow-sm hover:shadow-md',
+  success: 'bg-green-600 text-white hover:bg-green-700 active:bg-green-800 focus:ring-green-300 shadow-sm hover:shadow-md',
 };
 
 const sizes = {
@@ -25,7 +27,7 @@ const sizes = {
   lg: 'h-12 px-6 text-lg min-w-[44px]',
 };
 
-export function Button({ 
+export const Button = forwardRef<HTMLButtonElement, ButtonProps>(({ 
   variant = 'default', 
   size = 'md', 
   loading = false, 
@@ -34,14 +36,34 @@ export function Button({
   disabled,
   ariaLabel,
   ariaDescribedBy,
+  fullWidth = false,
+  onClick,
   ...props 
-}: ButtonProps) {
+}, ref) => {
+  const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    if (loading || disabled) {
+      e.preventDefault();
+      return;
+    }
+    onClick?.(e);
+  };
+
   return (
     <button
-      className={cn(baseStyles, variants[variant], sizes[size], className)}
+      ref={ref}
+      className={cn(
+        baseStyles, 
+        variants[variant], 
+        sizes[size], 
+        fullWidth && 'w-full',
+        loading && 'cursor-wait',
+        className
+      )}
       disabled={disabled || loading}
       aria-label={ariaLabel}
       aria-describedby={ariaDescribedBy}
+      aria-busy={loading}
+      onClick={handleClick}
       {...props}
     >
       {loading && (
@@ -66,12 +88,14 @@ export function Button({
               d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" 
             />
           </svg>
-          <span className="sr-only">Loading</span>
+          <span className="sr-only">Loading...</span>
         </>
       )}
-      <span className={loading ? 'opacity-75' : ''}>
+      <span className={cn('transition-opacity', loading && 'opacity-75')}>
         {children}
       </span>
     </button>
   );
-}
+});
+
+Button.displayName = 'Button';

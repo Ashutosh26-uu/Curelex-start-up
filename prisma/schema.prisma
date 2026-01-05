@@ -29,6 +29,10 @@ model User {
   emailVerifiedAt  DateTime?
   twoFactorEnabled Boolean   @default(false)
   twoFactorSecret  String?
+  isTwoFactorEnabled Boolean @default(false)
+  twoFactorBackupCodes String[]
+  refreshTokenFamily String?
+  refreshTokenVersion Int @default(0)
   backupCodes      String?
   sessionId        String?
   ipAddress        String?
@@ -53,6 +57,7 @@ model User {
   loginHistory  LoginHistory[]
   trustedDevices TrustedDevice[]
   auditLogs     AuditLog[]
+  securityEvents SecurityEvent[]
 
   @@index([email])
   @@index([role])
@@ -71,6 +76,27 @@ enum UserRole {
   CTO
   CFO
   CMO
+}
+
+model SecurityEvent {
+  id          String   @id @default(cuid())
+  eventType   String
+  userId      String?
+  identifier  String?
+  action      String?
+  ipAddress   String?
+  userAgent   String?
+  severity    String
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  
+  user        User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([eventType])
+  @@index([severity])
+  @@index([createdAt])
+  @@map("security_events")
 }
 
 model UserSession {
