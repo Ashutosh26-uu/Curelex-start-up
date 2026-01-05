@@ -1,27 +1,40 @@
 import { Injectable, CanActivate, ExecutionContext, ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import * as crypto from 'crypto';
+import * as csurf from 'csurf';
 
 @Injectable()
 export class CsrfGuard implements CanActivate {
+  private csrfProtection = csurf({
+    cookie: {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+    },
+  });
+
   constructor(private reflector: Reflector) {}
 
   canActivate(context: ExecutionContext): boolean {
-    const request = context.switchToHttp().getRequest();
-    const method = request.method;
+    const isPublic = this.reflector.getAllAndOverride<boolean>('isPublic', [
+      context.getHandler(),
+      context.getClass(),
+    ]);
 
-    // Skip CSRF for GET, HEAD, OPTIONS
-    if (['GET', 'HEAD', 'OPTIONS'].includes(method)) {
+    if (isPublic) {
       return true;
     }
 
-    const csrfToken = request.headers['x-csrf-token'] || request.body._csrf;
-    const sessionCsrf = request.session?.csrfToken;
+    const request = context.switchToHttp().getRequest();
+    const response = context.switchToHttp().getResponse();
 
-    if (!csrfToken || !sessionCsrf || csrfToken !== sessionCsrf) {
-      throw new ForbiddenException('Invalid CSRF token');
-    }
-
-    return true;
+    return new Promise((resolve, reject) => {
+      this.csrfProtection(request, response, (err) => {
+        if (err) {
+          reject(new ForbiddenException('Invalid CSRF token'));
+        } else {
+          resolve(true);
+        }
+      });
+    });
   }
 }

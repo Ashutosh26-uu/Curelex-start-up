@@ -1,34 +1,38 @@
 import { Controller, Get } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
-import { Public } from './common/decorators/public.decorator';
+import { DatabaseService } from '../common/database/database.service';
+import { Public } from '../common/decorators/public.decorator';
 
-@ApiTags('Health')
-@Controller()
-export class AppController {
+@Controller('health')
+export class HealthController {
+  constructor(private readonly databaseService: DatabaseService) {}
+
+  @Get()
   @Public()
-  @Get('health')
-  @ApiOperation({ summary: 'Health check endpoint' })
-  @ApiResponse({ status: 200, description: 'Service is healthy' })
-  getHealth() {
+  async healthCheck() {
+    const dbHealthy = await this.databaseService.healthCheck();
+    const connectionInfo = dbHealthy ? await this.databaseService.getConnectionInfo() : null;
+
     return {
-      status: 'ok',
+      status: dbHealthy ? 'healthy' : 'unhealthy',
       timestamp: new Date().toISOString(),
-      service: 'Healthcare Telemedicine Platform',
-      version: '1.0.0',
-      environment: process.env.NODE_ENV || 'development',
+      database: {
+        connected: dbHealthy,
+        info: connectionInfo,
+      },
+      uptime: process.uptime(),
+      memory: process.memoryUsage(),
     };
   }
 
+  @Get('db')
   @Public()
-  @Get()
-  @ApiOperation({ summary: 'Root endpoint' })
-  @ApiResponse({ status: 200, description: 'Welcome message' })
-  getRoot() {
+  async databaseHealth() {
+    const isHealthy = await this.databaseService.healthCheck();
+    
     return {
-      message: 'Welcome to Healthcare Telemedicine Platform API',
-      version: '1.0.0',
-      documentation: '/api/docs',
-      health: '/health',
+      status: isHealthy ? 'healthy' : 'unhealthy',
+      timestamp: new Date().toISOString(),
+      database: isHealthy ? await this.databaseService.getConnectionInfo() : null,
     };
   }
 }

@@ -1,568 +1,368 @@
 'use client';
 
-import { useState, useId } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Card } from '@/components/ui/Card';
-import { OptimizedImage } from '@/components/ui/OptimizedImage';
 import { useAuthStore } from '@/store/auth';
-import { Eye, EyeOff, Mail, Phone, User, Lock, Heart, AlertCircle } from 'lucide-react';
+import { Eye, EyeOff, Mail, Phone, Lock, AlertCircle, User, Building2 } from 'lucide-react';
+import Image from 'next/image';
 
 export default function AuthPage() {
+  const [activeTab, setActiveTab] = useState<'patient' | 'doctor'>('patient');
   const [mode, setMode] = useState<'login' | 'signup'>('login');
-  const [identifier, setIdentifier] = useState('');
-  const [password, setPassword] = useState('');
-  const [fullName, setFullName] = useState('');
-  const [role, setRole] = useState('PATIENT');
-  const [phone, setPhone] = useState('');
-  const [email, setEmail] = useState('');
-  const [dateOfBirth, setDateOfBirth] = useState('');
-  const [gender, setGender] = useState('');
-  const [address, setAddress] = useState('');
-  const [emergencyContact, setEmergencyContact] = useState('');
-  const [specialization, setSpecialization] = useState('');
-  const [licenseNumber, setLicenseNumber] = useState('');
-  const [aadharNumber, setAadharNumber] = useState('');
-  const [experience, setExperience] = useState('');
+  const [formData, setFormData] = useState({
+    identifier: '',
+    password: '',
+    confirmPassword: '',
+    fullName: '',
+    phone: '',
+    email: '',
+    role: 'PATIENT'
+  });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [userExists, setUserExists] = useState<boolean | null>(null);
   const [error, setError] = useState('');
-  const [validationErrors, setValidationErrors] = useState<{[key: string]: string}>({});
-  
-  // Generate unique IDs for accessibility
-  const formId = useId();
-  const errorId = useId();
-  const identifierId = useId();
-  const passwordId = useId();
   
   const router = useRouter();
   const { login } = useAuthStore();
 
-  const isEmail = identifier.includes('@');
+  const isEmail = formData.identifier.includes('@');
   const isValidIdentifier = isEmail ? 
-    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(identifier) : 
-    /^\+91[6-9]\d{9}$/.test(identifier);
-  
-  const isValidPhone = /^[6-9]\d{9}$/.test(phone);
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.identifier) : 
+    /^[6-9]\d{9}$/.test(formData.identifier.replace(/\D/g, ''));
 
-  const validateForm = () => {
-    const errors: {[key: string]: string} = {};
-    
-    if (!password || password.length < 8) errors.password = 'Password must be at least 8 characters';
-    if (mode === 'login' && !isValidIdentifier) errors.identifier = 'Valid email or phone number required';
-    if (mode === 'signup' && !fullName.trim()) errors.fullName = 'Full name is required';
-    
-    setValidationErrors(errors);
-    return Object.keys(errors).length === 0;
-  };
-
-  const checkUserExists = async () => {
-    if (!isValidIdentifier) return;
-    
-    try {
-      const response = await fetch('http://localhost:3001/api/v1/auth/check-user', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ identifier }),
-      });
-      
-      const data = await response.json();
-      setUserExists(data.exists);
-      
-      if (data.exists) {
-        setMode('login');
-      } else {
-        setMode('signup');
-      }
-    } catch (error) {
-      setError('Unable to verify user. Please try again.');
-    }
+  const handleInputChange = (field: string, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+    setError('');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    
-    if (!validateForm()) {
-      return;
-    }
-    
     setLoading(true);
 
     try {
-      console.log('Sending request:', {
-        identifier: mode === 'signup' ? `+91${phone}` : identifier,
-        password,
-        fullName: mode === 'signup' ? fullName : undefined,
-        role: mode === 'signup' ? role : undefined,
-        action: mode,
-      });
+      const endpoint = activeTab === 'patient' ? 
+        (mode === 'login' ? '/api/v1/auth/login/patient' : '/api/v1/auth/register/patient') :
+        '/api/v1/auth/login/doctor';
+
+      let requestData;
       
-      const response = await fetch('http://localhost:3001/api/v1/auth/unified', {
+      if (mode === 'login') {
+        if (activeTab === 'patient') {
+          requestData = isEmail ? 
+            { email: formData.identifier, password: formData.password } :
+            { phone: `+91${formData.identifier.replace(/\D/g, '')}`, password: formData.password };
+        } else {
+          requestData = { email: formData.identifier, password: formData.password };
+        }
+      } else {
+        const [firstName, ...lastNameParts] = formData.fullName.split(' ');
+        requestData = {
+          email: formData.email,
+          phone: formData.phone.replace(/\D/g, ''),
+          password: formData.password,
+          confirmPassword: formData.confirmPassword,
+          firstName,
+          lastName: lastNameParts.join(' ') || ''
+        };
+      }
+
+      const response = await fetch(`http://localhost:3001${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          identifier: mode === 'signup' ? `+91${phone}` : identifier,
-          password,
-          fullName: mode === 'signup' ? fullName : undefined,
-          role: mode === 'signup' ? role : undefined,
-          action: mode,
-        }),
+        body: JSON.stringify(requestData),
       });
 
       const data = await response.json();
-      console.log('Response:', data);
 
       if (response.ok) {
-        login(data.user, data.accessToken, data.refreshToken);
-        
-        switch (data.user.role) {
-          case 'PATIENT':
-            router.push('/patient');
-            break;
-          case 'DOCTOR':
-          case 'JUNIOR_DOCTOR':
-            router.push('/doctor');
-            break;
-          default:
-            router.push('/dashboard');
+        if (mode === 'signup') {
+          setMode('login');
+          setError('');
+          setFormData({
+            identifier: '',
+            password: '',
+            confirmPassword: '',
+            fullName: '',
+            phone: '',
+            email: '',
+            role: 'PATIENT'
+          });
+          alert('Registration successful! Please login.');
+        } else {
+          login(data.user, data.accessToken, data.refreshToken);
+          
+          switch (data.user.role) {
+            case 'PATIENT':
+              router.push('/patient');
+              break;
+            case 'DOCTOR':
+            case 'JUNIOR_DOCTOR':
+              router.push('/doctor');
+              break;
+            default:
+              router.push('/dashboard');
+          }
         }
       } else {
-        setError(data.message || 'Authentication failed. Please check your credentials.');
+        setError(data.message || 'Authentication failed');
       }
     } catch (error) {
-      setError('Network error. Please check your connection and try again.');
+      setError('Network error. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4 relative">
-      {/* Background Logo */}
-      <div className="fixed inset-0 flex items-center justify-center pointer-events-none z-0" aria-hidden="true">
-        <OptimizedImage
-          src="/images/crelex.jpg"
-          alt=""
-          width={400}
-          height={400}
-          className="opacity-15 grayscale"
-          loading="lazy"
-          priority={false}
-        />
-      </div>
-
-      <Card className="w-full max-w-md mx-auto p-6 sm:p-8 space-y-6 relative z-10 bg-white/95 backdrop-blur-sm shadow-xl">
-        <header className="text-center space-y-2">
-          <div className="flex items-center justify-center space-x-3">
-            <OptimizedImage
+    <div className="min-h-screen bg-gradient-to-br from-teal-50 via-white to-orange-50 flex items-center justify-center p-4">
+      <Card className="w-full max-w-md mx-auto p-8 space-y-6 bg-white shadow-2xl border-0">
+        {/* Header */}
+        <div className="text-center space-y-4">
+          <div className="flex items-center justify-center">
+            <Image
               src="/images/crelex.jpg"
-              alt="CureLex Healthcare Platform Logo"
-              width={48}
-              height={48}
-              className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg"
-              priority={true}
+              alt="CureLex Logo"
+              width={60}
+              height={60}
+              className="w-15 h-15 rounded-xl"
+              priority={false}
+              loading="lazy"
             />
-            <h1 className="text-xl sm:text-2xl font-bold text-gray-900">CureLex</h1>
           </div>
-          <p className="text-gray-700 text-sm sm:text-base">
-            {mode === 'login' ? 'Welcome back to your healthcare dashboard' : 'Join our secure healthcare community'}
-          </p>
-        </header>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Welcome to CureLex</h1>
+            <p className="text-gray-600 text-sm mt-1">
+              {mode === 'login' ? 'Sign in to your account' : 'Create your account'}
+            </p>
+          </div>
+        </div>
 
-        {error && (
-          <div 
-            id={errorId}
-            role="alert"
-            aria-live="polite"
-            className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md text-sm flex items-start gap-2"
+        {/* User Type Tabs */}
+        <div className="flex bg-gray-100 rounded-lg p-1">
+          <button
+            type="button"
+            onClick={() => setActiveTab('patient')}
+            className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-md text-sm font-medium transition-colors ${
+              activeTab === 'patient'
+                ? 'bg-white text-teal-600 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
           >
-            <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" aria-hidden="true" />
+            <User className="w-4 h-4" />
+            Patient
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('doctor')}
+            className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-md text-sm font-medium transition-colors ${
+              activeTab === 'doctor'
+                ? 'bg-white text-teal-600 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            <Building2 className="w-4 h-4" />
+            Doctor
+          </button>
+        </div>
+
+        {/* Error Message */}
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm flex items-start gap-2">
+            <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
             <span>{error}</span>
           </div>
         )}
 
-        <form 
-          id={formId}
-          onSubmit={handleSubmit} 
-          className="space-y-4"
-          aria-describedby={error ? errorId : undefined}
-          noValidate
-        >
-          <div className="space-y-2">
-            <label 
-              htmlFor={identifierId}
-              className="text-sm font-medium text-gray-900 block"
-            >
-              Email or Phone Number *
-            </label>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                {isEmail ? (
-                  <Mail className="h-5 w-5 text-gray-400" aria-hidden="true" />
-                ) : (
-                  <Phone className="h-5 w-5 text-gray-400" aria-hidden="true" />
-                )}
-              </div>
-              <Input
-                id={identifierId}
-                type="text"
-                value={identifier}
-                onChange={(e) => setIdentifier(e.target.value)}
-                onBlur={checkUserExists}
-                placeholder="Enter email or phone number"
-                className="pl-10"
-                aria-required="true"
-                aria-invalid={!!validationErrors.identifier}
-                aria-describedby={validationErrors.identifier ? `${identifierId}-error` : undefined}
-                autoComplete={isEmail ? 'email' : 'tel'}
-                required
-              />
-            </div>
-            {validationErrors.identifier && (
-              <p id={`${identifierId}-error`} className="text-xs text-red-600" role="alert">
-                {validationErrors.identifier}
-              </p>
-            )}
-            {userExists !== null && (
-              <p 
-                className={`text-xs ${userExists ? 'text-green-700' : 'text-blue-700'}`}
-                aria-live="polite"
-              >
-                {userExists ? 'Account found - please login' : 'New user - please sign up'}
-              </p>
-            )}
-          </div>
-
-          {mode === 'login' && (
-            <div className="space-y-2">
-              <label htmlFor="loginRole" className="text-sm font-medium text-gray-900 block">
-                Login as *
-              </label>
-              <select
-                id="loginRole"
-                value={role}
-                onChange={(e) => setRole(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
-                required
-              >
-                <option value="PATIENT">Patient</option>
-                <option value="DOCTOR">Doctor</option>
-                <option value="NURSE">Nurse</option>
-              </select>
-            </div>
-          )}
-
-          {mode === 'signup' && (
-            <div className="space-y-4 max-h-96 overflow-y-auto">
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="space-y-5">
+          {mode === 'login' ? (
+            <>
+              {/* Login Form */}
               <div className="space-y-2">
-                <label htmlFor="role" className="text-sm font-medium text-gray-900 block">
-                  I am a *
+                <label className="text-sm font-medium text-gray-900 block">
+                  {activeTab === 'patient' ? 'Email or Phone Number' : 'Email Address'}
                 </label>
-                <select
-                  id="role"
-                  value={role}
-                  onChange={(e) => setRole(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
-                  required
-                >
-                  <option value="PATIENT">Patient</option>
-                  <option value="DOCTOR">Doctor</option>
-                  <option value="NURSE">Nurse</option>
-                </select>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    {isEmail || activeTab === 'doctor' ? (
+                      <Mail className="h-5 w-5 text-gray-400" />
+                    ) : (
+                      <Phone className="h-5 w-5 text-gray-400" />
+                    )}
+                  </div>
+                  <Input
+                    type="text"
+                    value={formData.identifier}
+                    onChange={(e) => handleInputChange('identifier', e.target.value)}
+                    placeholder={activeTab === 'patient' ? 'Enter email or phone' : 'Enter email address'}
+                    className="pl-10 h-12"
+                    required
+                  />
+                </div>
               </div>
+
               <div className="space-y-2">
-                <label htmlFor="fullName" className="text-sm font-medium text-gray-900 block">
-                  Full Name *
-                </label>
+                <label className="text-sm font-medium text-gray-900 block">Password</label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Lock className="h-5 w-5 text-gray-400" />
+                  </div>
+                  <Input
+                    type={showPassword ? 'text' : 'password'}
+                    value={formData.password}
+                    onChange={(e) => handleInputChange('password', e.target.value)}
+                    placeholder="Enter your password"
+                    className="pl-10 pr-12 h-12"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center hover:bg-gray-50 rounded-r-md"
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-5 w-5 text-gray-400" />
+                    ) : (
+                      <Eye className="h-5 w-5 text-gray-400" />
+                    )}
+                  </button>
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              {/* Signup Form */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-900 block">Full Name</label>
                 <Input
-                  id="fullName"
                   type="text"
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
+                  value={formData.fullName}
+                  onChange={(e) => handleInputChange('fullName', e.target.value)}
                   placeholder="Enter your full name"
-                  aria-required="true"
-                  aria-invalid={!!validationErrors.fullName}
-                  aria-describedby={validationErrors.fullName ? 'fullName-error' : undefined}
-                  autoComplete="name"
+                  className="h-12"
                   required
                 />
-                {validationErrors.fullName && (
-                  <p id="fullName-error" className="text-xs text-red-600" role="alert">
-                    {validationErrors.fullName}
-                  </p>
-                )}
               </div>
 
               <div className="space-y-2">
-                <label htmlFor="phone" className="text-sm font-medium text-gray-900 block">
-                  Phone Number *
-                </label>
+                <label className="text-sm font-medium text-gray-900 block">Email Address</label>
+                <Input
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => handleInputChange('email', e.target.value)}
+                  placeholder="Enter your email address"
+                  className="h-12"
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-900 block">Phone Number</label>
                 <div className="flex">
-                  <span 
-                    className="inline-flex items-center px-3 text-sm text-gray-900 bg-gray-200 border border-r-0 border-gray-300 rounded-l-md"
-                    aria-label="Country code India"
-                  >
+                  <span className="inline-flex items-center px-3 text-sm text-gray-900 bg-gray-200 border border-r-0 border-gray-300 rounded-l-md h-12">
                     +91
                   </span>
                   <Input
-                    id="phone"
                     type="tel"
-                    value={phone}
+                    value={formData.phone}
                     onChange={(e) => {
                       const value = e.target.value.replace(/\D/g, '').slice(0, 10);
-                      setPhone(value);
+                      handleInputChange('phone', value);
                     }}
                     placeholder="Enter 10-digit mobile number"
-                    className="rounded-l-none"
-                    aria-required="true"
-                    aria-invalid={!!(validationErrors.phone || (phone && !isValidPhone))}
-                    aria-describedby={validationErrors.phone || (phone && !isValidPhone) ? 'phone-error' : undefined}
-                    autoComplete="tel"
+                    className="rounded-l-none h-12"
                     maxLength={10}
                     required
                   />
                 </div>
-                {(validationErrors.phone || (phone && !isValidPhone)) && (
-                  <p id="phone-error" className="text-xs text-red-600" role="alert">
-                    {validationErrors.phone || 'Please enter a valid 10-digit mobile number'}
-                  </p>
-                )}
               </div>
 
               <div className="space-y-2">
-                <label htmlFor="email" className="text-sm font-medium text-gray-900 block">
-                  Email Address *
-                </label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Enter your email address"
-                  aria-required="true"
-                  aria-invalid={!!validationErrors.email}
-                  aria-describedby={validationErrors.email ? 'email-error' : undefined}
-                  autoComplete="email"
-                  required
-                />
-                {validationErrors.email && (
-                  <p id="email-error" className="text-xs text-red-600" role="alert">
-                    {validationErrors.email}
-                  </p>
-                )}
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700">Date of Birth *</label>
+                <label className="text-sm font-medium text-gray-900 block">Password</label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Lock className="h-5 w-5 text-gray-400" />
+                  </div>
                   <Input
-                    type="date"
-                    value={dateOfBirth}
-                    onChange={(e) => setDateOfBirth(e.target.value)}
+                    type={showPassword ? 'text' : 'password'}
+                    value={formData.password}
+                    onChange={(e) => handleInputChange('password', e.target.value)}
+                    placeholder="Create a password (min 8 characters)"
+                    className="pl-10 pr-12 h-12"
+                    minLength={8}
                     required
                   />
-                </div>
-                <div className="space-y-2">
-                  <label htmlFor="gender" className="text-sm font-medium text-gray-900 block">
-                    Gender *
-                  </label>
-                  <select
-                    id="gender"
-                    value={gender}
-                    onChange={(e) => setGender(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
-                    aria-required="true"
-                    aria-invalid={!!validationErrors.gender}
-                    aria-describedby={validationErrors.gender ? 'gender-error' : undefined}
-                    required
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center hover:bg-gray-50 rounded-r-md"
                   >
-                    <option value="">Select Gender</option>
-                    <option value="MALE">Male</option>
-                    <option value="FEMALE">Female</option>
-                    <option value="OTHER">Other</option>
-                  </select>
-                  {validationErrors.gender && (
-                    <p id="gender-error" className="text-xs text-red-600" role="alert">
-                      {validationErrors.gender}
-                    </p>
-                  )}
+                    {showPassword ? (
+                      <EyeOff className="h-5 w-5 text-gray-400" />
+                    ) : (
+                      <Eye className="h-5 w-5 text-gray-400" />
+                    )}
+                  </button>
                 </div>
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Address *</label>
+                <label className="text-sm font-medium text-gray-900 block">Confirm Password</label>
                 <Input
-                  type="text"
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  placeholder="Enter your complete address"
+                  type="password"
+                  value={formData.confirmPassword}
+                  onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
+                  placeholder="Confirm your password"
+                  className="h-12"
                   required
                 />
               </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Emergency Contact *</label>
-                <div className="flex">
-                  <span className="inline-flex items-center px-3 text-sm text-gray-900 bg-gray-200 border border-r-0 border-gray-300 rounded-l-md">+91</span>
-                  <Input
-                    type="tel"
-                    value={emergencyContact}
-                    onChange={(e) => {
-                      const value = e.target.value.replace(/\D/g, '').slice(0, 10);
-                      setEmergencyContact(value);
-                    }}
-                    placeholder="Emergency contact number"
-                    className="rounded-l-none"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Aadhar Number *</label>
-                <Input
-                  type="text"
-                  value={aadharNumber}
-                  onChange={(e) => {
-                    const value = e.target.value.replace(/\D/g, '').slice(0, 12);
-                    setAadharNumber(value);
-                  }}
-                  placeholder="Enter 12-digit Aadhar number"
-                  required
-                />
-              </div>
-
-              {(role === 'DOCTOR' || role === 'JUNIOR_DOCTOR') && (
-                <>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">Specialization *</label>
-                    <Input
-                      type="text"
-                      value={specialization}
-                      onChange={(e) => setSpecialization(e.target.value)}
-                      placeholder="Enter your specialization"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">Experience (Years) *</label>
-                    <Input
-                      type="number"
-                      value={experience}
-                      onChange={(e) => setExperience(e.target.value)}
-                      placeholder="Years of experience"
-                      min="0"
-                      max="50"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">License Number *</label>
-                    <Input
-                      type="text"
-                      value={licenseNumber}
-                      onChange={(e) => setLicenseNumber(e.target.value)}
-                      placeholder="Enter your medical license number"
-                      required
-                    />
-                  </div>
-                </>
-              )}
-            </div>
+            </>
           )}
 
-          <div className="space-y-2">
-            <label htmlFor={passwordId} className="text-sm font-medium text-gray-900 block">
-              Password *
-            </label>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Lock className="h-5 w-5 text-gray-400" aria-hidden="true" />
-              </div>
-              <Input
-                id={passwordId}
-                type={showPassword ? 'text' : 'password'}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder={mode === 'login' ? 'Enter password' : 'Create password (min 8 characters)'}
-                className="pl-10 pr-12"
-                aria-required="true"
-                aria-invalid={validationErrors.password ? 'true' : 'false'}
-                aria-describedby={validationErrors.password ? `${passwordId}-error` : mode === 'signup' ? `${passwordId}-help` : undefined}
-                autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-                minLength={8}
-                required
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute inset-y-0 right-0 pr-3 flex items-center hover:bg-gray-50 rounded-r-md focus:outline-none focus:ring-2 focus:ring-blue-600"
-                aria-label={showPassword ? 'Hide password' : 'Show password'}
-                tabIndex={0}
-              >
-                {showPassword ? (
-                  <EyeOff className="h-5 w-5 text-gray-400" aria-hidden="true" />
-                ) : (
-                  <Eye className="h-5 w-5 text-gray-400" aria-hidden="true" />
-                )}
-              </button>
-            </div>
-            {mode === 'signup' && !validationErrors.password && (
-              <p id={`${passwordId}-help`} className="text-xs text-gray-600">
-                Password must be at least 8 characters long
-              </p>
-            )}
-            {validationErrors.password && (
-              <p id={`${passwordId}-error`} className="text-xs text-red-600" role="alert">
-                {validationErrors.password}
-              </p>
-            )}
-          </div>
-
+          {/* Submit Button */}
           <Button
             type="submit"
-            className={`w-full min-h-[44px] text-base font-medium focus:ring-4 focus:ring-offset-2 ${mode === 'login' ? 'bg-gray-600 hover:bg-gray-700 focus:ring-gray-300' : 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-300'} disabled:opacity-50 disabled:cursor-not-allowed`}
-            disabled={loading}
-            aria-describedby={loading ? 'loading-status' : undefined}
+            className="w-full bg-gradient-to-r from-teal-600 to-orange-500 hover:from-teal-700 hover:to-orange-600 text-white font-medium py-3 h-12 rounded-lg transition-all duration-200 disabled:opacity-50 mt-6 shadow-lg"
+            disabled={loading || (mode === 'login' && !isValidIdentifier)}
           >
-            {loading ? (
-              <>
-                <span className="sr-only">Processing your request</span>
-                <span aria-hidden="true">Please wait...</span>
-              </>
-            ) : (
-              mode === 'login' ? 'Sign In' : 'Create Your Account'
-            )}
+            {loading ? 'Please wait...' : (mode === 'login' ? 'Sign In' : 'Create Account')}
           </Button>
-          {loading && (
-            <div id="loading-status" className="sr-only" aria-live="polite">
-              Processing your {mode === 'login' ? 'login' : 'registration'} request
-            </div>
-          )}
         </form>
 
-        <div className="text-center">
+        {/* Mode Switch */}
+        <div className="text-center pt-4">
           <button
             type="button"
             onClick={() => {
               setMode(mode === 'login' ? 'signup' : 'login');
               setError('');
-              setValidationErrors({});
+              setFormData({
+                identifier: '',
+                password: '',
+                confirmPassword: '',
+                fullName: '',
+                phone: '',
+                email: '',
+                role: 'PATIENT'
+              });
             }}
-            className="text-sm text-blue-600 hover:text-blue-500 underline focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2 rounded px-2 py-1"
-            aria-describedby="mode-switch-help"
+            className="text-sm text-teal-600 hover:text-orange-500 font-medium transition-colors"
           >
             {mode === 'login' 
               ? "Don't have an account? Sign up" 
               : "Already have an account? Sign in"
             }
           </button>
-          <div id="mode-switch-help" className="sr-only">
-            Switch between login and registration forms
-          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="text-center text-xs text-gray-500 pt-4 border-t border-gray-100">
+          <p>Secure • HIPAA Compliant • Trusted Healthcare Platform</p>
         </div>
       </Card>
     </div>

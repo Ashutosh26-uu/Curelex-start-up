@@ -3,15 +3,16 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
+// Enhanced User model with security features
 model User {
   id               String    @id @default(cuid())
   email            String    @unique
   password         String
-  role             String
+  role             UserRole
   isActive         Boolean   @default(true)
   isDeleted        Boolean   @default(false)
   isLocked         Boolean   @default(false)
@@ -37,6 +38,8 @@ model User {
   deviceFingerprint String?
   lastPasswordChange DateTime?
   accountLockUntil DateTime?
+  dataRetentionDate DateTime? // For GDPR compliance
+  consentVersion   String?   // Track consent versions
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
   deletedAt        DateTime?
@@ -49,8 +52,25 @@ model User {
   sessions      UserSession[]
   loginHistory  LoginHistory[]
   trustedDevices TrustedDevice[]
+  auditLogs     AuditLog[]
 
+  @@index([email])
+  @@index([role])
+  @@index([isActive, isDeleted])
+  @@index([createdAt])
   @@map("users")
+}
+
+enum UserRole {
+  PATIENT
+  DOCTOR
+  JUNIOR_DOCTOR
+  NURSE
+  ADMIN
+  CEO
+  CTO
+  CFO
+  CMO
 }
 
 model UserSession {
@@ -61,11 +81,16 @@ model UserSession {
   userAgent   String?
   isActive    Boolean  @default(true)
   expiresAt   DateTime
+  lastActivity DateTime @default(now())
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([userId])
+  @@index([sessionId])
+  @@index([expiresAt])
+  @@index([isActive])
   @@map("user_sessions")
 }
 
@@ -79,10 +104,16 @@ model LoginHistory {
   failReason  String?
   location    String?
   device      String?
+  riskScore   Int?     @default(0)
   createdAt   DateTime @default(now())
 
   user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
 
+  @@index([userId])
+  @@index([email])
+  @@index([success])
+  @@index([createdAt])
+  @@index([ipAddress])
   @@map("login_history")
 }
 
@@ -91,15 +122,19 @@ model Profile {
   userId      String   @unique
   firstName   String
   lastName    String
-  phone       String?
+  phone       String?  // Standardized format: +1234567890
   avatar      String?
   dateOfBirth DateTime?
-  gender      String?
+  gender      Gender?
   address     String?
   city        String?
   state       String?
   zipCode     String?
   country     String   @default("US")
+  emergencyContactName String?
+  emergencyContactPhone String?
+  preferredLanguage String @default("en")
+  timezone     String   @default("UTC")
   isDeleted   Boolean  @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -107,21 +142,37 @@ model Profile {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([userId])
+  @@index([phone])
   @@map("profiles")
 }
 
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+  PREFER_NOT_TO_SAY
+}
+
+// Enhanced Patient model with encryption for sensitive data
 model Patient {
   id                String        @id @default(cuid())
   userId            String        @unique
   patientId         String        @unique
+  mrn               String?       @unique // Medical Record Number
   emergencyContact  String?
   emergencyPhone    String?
-  bloodGroup        String?
-  allergies         String?
-  chronicConditions String?
-  insuranceNumber   String?
+  bloodGroup        BloodGroup?
+  allergies         String?       // Encrypted field
+  chronicConditions String?       // Encrypted field
+  medications       String?       // Encrypted field
+  insuranceNumber   String?       // Encrypted field
   insuranceProvider String?
-  status            String @default("UNASSIGNED")
+  primaryPhysician  String?
+  status            PatientStatus @default(ACTIVE)
+  riskLevel         RiskLevel     @default(LOW)
+  lastVisit         DateTime?
+  nextAppointment   DateTime?
   isDeleted         Boolean       @default(false)
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
@@ -133,21 +184,64 @@ model Patient {
   medicalHistory  MedicalHistory[]
   prescriptions   Prescription[]
   assignedDoctors DoctorPatientAssignment[]
+  labResults      LabResult[]
+  documents       PatientDocument[]
 
+  @@index([userId])
+  @@index([patientId])
+  @@index([mrn])
+  @@index([status])
+  @@index([riskLevel])
+  @@index([createdAt])
   @@map("patients")
+}
+
+enum BloodGroup {
+  A_POSITIVE
+  A_NEGATIVE
+  B_POSITIVE
+  B_NEGATIVE
+  AB_POSITIVE
+  AB_NEGATIVE
+  O_POSITIVE
+  O_NEGATIVE
+}
+
+enum PatientStatus {
+  ACTIVE
+  INACTIVE
+  DISCHARGED
+  TRANSFERRED
+  DECEASED
+}
+
+enum RiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
 }
 
 model Doctor {
   id              String   @id @default(cuid())
   userId          String   @unique
   doctorId        String   @unique
+  npi             String?  @unique // National Provider Identifier
   specialization  String
   licenseNumber   String   @unique
+  licenseState    String
+  licenseExpiry   DateTime?
   experience      Int
-  consultationFee Float
+  consultationFee Decimal  @db.Decimal(10,2)
   qualification   String?
   hospital        String?
+  department      String?
   isAvailable     Boolean  @default(true)
+  maxPatientsPerDay Int    @default(20)
+  workingHours    Json?    // Store working schedule
+  languages       String[] // Supported languages
+  rating          Decimal? @db.Decimal(3,2)
+  totalReviews    Int      @default(0)
   isDeleted       Boolean  @default(false)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -159,6 +253,13 @@ model Doctor {
   assignedPatients DoctorPatientAssignment[]
   vitalsRecorded   Vital[]                   @relation("VitalRecordedBy")
 
+  @@index([userId])
+  @@index([doctorId])
+  @@index([npi])
+  @@index([licenseNumber])
+  @@index([specialization])
+  @@index([isAvailable])
+  @@index([createdAt])
   @@map("doctors")
 }
 
@@ -168,6 +269,8 @@ model Officer {
   officerId   String   @unique
   department  String?
   position    String?
+  accessLevel Int      @default(1) // 1-10 access levels
+  permissions Json?    // Granular permissions
   isDeleted   Boolean  @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -175,6 +278,9 @@ model Officer {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([userId])
+  @@index([officerId])
+  @@index([department])
   @@map("officers")
 }
 
@@ -186,6 +292,8 @@ model DoctorPatientAssignment {
   assignedAt DateTime  @default(now())
   unassignedAt DateTime?
   isActive   Boolean   @default(true)
+  isPrimary  Boolean   @default(false)
+  notes      String?
   isDeleted  Boolean   @default(false)
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
@@ -195,6 +303,9 @@ model DoctorPatientAssignment {
   patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
 
   @@unique([doctorId, patientId])
+  @@index([doctorId])
+  @@index([patientId])
+  @@index([isActive])
   @@map("doctor_patient_assignments")
 }
 
@@ -205,12 +316,15 @@ model Appointment {
   scheduledAt   DateTime
   completedAt   DateTime?
   duration      Int               @default(30)
-  status        String @default("SCHEDULED")
+  status        AppointmentStatus @default(SCHEDULED)
+  type          AppointmentType   @default(CONSULTATION)
   meetLink      String?
-  notes         String?
-  diagnosis     String?
+  notes         String?           // Encrypted field
+  diagnosis     String?           // Encrypted field
   followUpDate  DateTime?
   cancelReason  String?
+  priority      Priority          @default(NORMAL)
+  reminderSent  Boolean           @default(false)
   isDeleted     Boolean           @default(false)
   createdAt     DateTime          @default(now())
   updatedAt     DateTime          @updatedAt
@@ -219,18 +333,55 @@ model Appointment {
   patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
   doctor  Doctor  @relation(fields: [doctorId], references: [id], onDelete: Cascade)
 
+  @@index([patientId])
+  @@index([doctorId])
+  @@index([scheduledAt])
+  @@index([status])
+  @@index([type])
+  @@index([priority])
   @@map("appointments")
+}
+
+enum AppointmentStatus {
+  SCHEDULED
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+  RESCHEDULED
+}
+
+enum AppointmentType {
+  CONSULTATION
+  FOLLOW_UP
+  EMERGENCY
+  ROUTINE_CHECKUP
+  TELEMEDICINE
+  PROCEDURE
+}
+
+enum Priority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+  EMERGENCY
 }
 
 model Vital {
   id         String    @id @default(cuid())
   patientId  String
   doctorId   String?
-  type       String
+  type       VitalType
   value      String
   unit       String
+  normalRange String?
+  isAbnormal Boolean   @default(false)
+  severity   Severity? 
   recordedBy String
   recordedAt DateTime  @default(now())
+  deviceId   String?   // For IoT device integration
   notes      String?
   isDeleted  Boolean   @default(false)
   createdAt  DateTime  @default(now())
@@ -240,19 +391,46 @@ model Vital {
   patient        Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
   recordedByUser Doctor? @relation("VitalRecordedBy", fields: [doctorId], references: [id])
 
+  @@index([patientId])
+  @@index([doctorId])
+  @@index([type])
+  @@index([recordedAt])
+  @@index([isAbnormal])
   @@map("vitals")
+}
+
+enum VitalType {
+  BLOOD_PRESSURE
+  HEART_RATE
+  TEMPERATURE
+  OXYGEN_SATURATION
+  BLOOD_SUGAR
+  WEIGHT
+  HEIGHT
+  BMI
+  RESPIRATORY_RATE
+}
+
+enum Severity {
+  NORMAL
+  MILD
+  MODERATE
+  SEVERE
+  CRITICAL
 }
 
 model MedicalHistory {
   id          String    @id @default(cuid())
   patientId   String
-  condition   String
-  diagnosis   String
-  treatment   String?
-  severity    String?
+  condition   String    // Encrypted field
+  diagnosis   String    // Encrypted field
+  treatment   String?   // Encrypted field
+  severity    Severity?
   diagnosedAt DateTime
   resolvedAt  DateTime?
   isActive    Boolean   @default(true)
+  icdCode     String?   // ICD-10 code
+  notes       String?   // Encrypted field
   isDeleted   Boolean   @default(false)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -260,6 +438,10 @@ model MedicalHistory {
 
   patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
 
+  @@index([patientId])
+  @@index([condition])
+  @@index([diagnosedAt])
+  @@index([isActive])
   @@map("medical_history")
 }
 
@@ -267,15 +449,17 @@ model Prescription {
   id           String             @id @default(cuid())
   patientId    String
   doctorId     String
-  medication   String
+  medication   String             // Encrypted field
   dosage       String
   frequency    String
   duration     String
-  instructions String?
-  status       String @default("ACTIVE")
+  instructions String?            // Encrypted field
+  status       PrescriptionStatus @default(ACTIVE)
   startDate    DateTime           @default(now())
   endDate      DateTime?
   prescribedAt DateTime           @default(now())
+  refillsLeft  Int                @default(0)
+  pharmacyId   String?
   isDeleted    Boolean            @default(false)
   createdAt    DateTime           @default(now())
   updatedAt    DateTime           @updatedAt
@@ -284,21 +468,98 @@ model Prescription {
   patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
   doctor  Doctor  @relation(fields: [doctorId], references: [id], onDelete: Cascade)
 
+  @@index([patientId])
+  @@index([doctorId])
+  @@index([status])
+  @@index([prescribedAt])
   @@map("prescriptions")
+}
+
+enum PrescriptionStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
+  EXPIRED
+  ON_HOLD
+}
+
+model LabResult {
+  id          String    @id @default(cuid())
+  patientId   String
+  testName    String
+  testCode    String?
+  result      String    // Encrypted field
+  normalRange String?
+  unit        String?
+  isAbnormal  Boolean   @default(false)
+  severity    Severity?
+  testDate    DateTime
+  reportedAt  DateTime  @default(now())
+  labName     String?
+  notes       String?   // Encrypted field
+  isDeleted   Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([patientId])
+  @@index([testName])
+  @@index([testDate])
+  @@index([isAbnormal])
+  @@map("lab_results")
+}
+
+model PatientDocument {
+  id          String       @id @default(cuid())
+  patientId   String
+  fileName    String
+  fileType    String
+  fileSize    Int
+  filePath    String       // Encrypted storage path
+  category    DocumentType
+  uploadedBy  String
+  uploadedAt  DateTime     @default(now())
+  isEncrypted Boolean      @default(true)
+  checksum    String       // File integrity check
+  isDeleted   Boolean      @default(false)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  deletedAt   DateTime?
+
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([patientId])
+  @@index([category])
+  @@index([uploadedAt])
+  @@map("patient_documents")
+}
+
+enum DocumentType {
+  LAB_REPORT
+  PRESCRIPTION
+  IMAGING
+  DISCHARGE_SUMMARY
+  INSURANCE
+  CONSENT_FORM
+  OTHER
 }
 
 model Notification {
   id         String             @id @default(cuid())
   userId     String
-  type       String
-  status     String @default("PENDING")
+  type       NotificationType
+  status     NotificationStatus @default(PENDING)
   title      String
   message    String
   isRead     Boolean            @default(false)
   readAt     DateTime?
   sentAt     DateTime?
   scheduledAt DateTime?
-  metadata   String?
+  priority   Priority           @default(NORMAL)
+  metadata   Json?
+  retryCount Int                @default(0)
   isDeleted  Boolean            @default(false)
   createdAt  DateTime           @default(now())
   updatedAt  DateTime           @updatedAt
@@ -306,7 +567,31 @@ model Notification {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([userId])
+  @@index([type])
+  @@index([status])
+  @@index([priority])
+  @@index([scheduledAt])
   @@map("notifications")
+}
+
+enum NotificationType {
+  APPOINTMENT_REMINDER
+  MEDICATION_REMINDER
+  LAB_RESULT
+  PRESCRIPTION_READY
+  SYSTEM_ALERT
+  SECURITY_ALERT
+  BILLING
+  GENERAL
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  DELIVERED
+  FAILED
+  CANCELLED
 }
 
 model TrustedDevice {
@@ -319,24 +604,84 @@ model TrustedDevice {
   ipAddress         String?
   isActive          Boolean  @default(true)
   lastUsed          DateTime @default(now())
+  trustLevel        Int      @default(1) // 1-5 trust levels
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, deviceFingerprint])
+  @@index([userId])
+  @@index([deviceFingerprint])
+  @@index([isActive])
   @@map("trusted_devices")
 }
 
+// Enhanced Audit Log with proper indexing and retention
 model AuditLog {
-  id        String   @id @default(cuid())
+  id        String     @id @default(cuid())
   userId    String?
-  action    String
+  action    AuditAction
   resource  String
-  details   String?
+  resourceId String?
+  details   Json?
   ipAddress String?
   userAgent String?
-  createdAt DateTime @default(now())
+  sessionId String?
+  success   Boolean    @default(true)
+  errorMessage String?
+  riskScore Int        @default(0)
+  retentionDate DateTime? // For automated cleanup
+  createdAt DateTime   @default(now())
 
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([action])
+  @@index([resource])
+  @@index([createdAt])
+  @@index([retentionDate])
+  @@index([riskScore])
   @@map("audit_logs")
+}
+
+enum AuditAction {
+  CREATE
+  READ
+  UPDATE
+  DELETE
+  LOGIN
+  LOGOUT
+  EXPORT
+  PRINT
+  SHARE
+  ACCESS_DENIED
+  SYSTEM_ERROR
+}
+
+// Data retention and archival
+model DataRetentionPolicy {
+  id          String   @id @default(cuid())
+  tableName   String   @unique
+  retentionDays Int
+  archiveAfterDays Int?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("data_retention_policies")
+}
+
+// System configuration
+model SystemConfig {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String
+  category  String
+  isEncrypted Boolean @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([category])
+  @@map("system_config")
 }

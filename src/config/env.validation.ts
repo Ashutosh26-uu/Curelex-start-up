@@ -1,7 +1,20 @@
-import { plainToInstance } from 'class-transformer';
-import { IsString, IsNumber, IsOptional, validateSync, IsUrl, IsEmail } from 'class-validator';
+import { plainToInstance, Transform } from 'class-transformer';
+import { IsEnum, IsNumber, IsString, IsOptional, validateSync, IsBoolean } from 'class-validator';
+
+enum Environment {
+  Development = 'development',
+  Production = 'production',
+  Test = 'test',
+}
 
 class EnvironmentVariables {
+  @IsEnum(Environment)
+  NODE_ENV: Environment = Environment.Development;
+
+  @IsNumber()
+  @Transform(({ value }) => parseInt(value, 10))
+  PORT: number = 3001;
+
   @IsString()
   DATABASE_URL: string;
 
@@ -13,71 +26,39 @@ class EnvironmentVariables {
 
   @IsString()
   @IsOptional()
-  JWT_EXPIRES_IN: string = '24h';
+  JWT_EXPIRES_IN: string = '15m';
 
   @IsString()
   @IsOptional()
-  JWT_REFRESH_EXPIRES_IN: string = '30d';
+  JWT_REFRESH_EXPIRES_IN: string = '7d';
+
+  @IsString()
+  @IsOptional()
+  FRONTEND_URL: string = 'http://localhost:3000';
 
   @IsNumber()
+  @Transform(({ value }) => parseInt(value, 10))
   @IsOptional()
-  PORT: number = 3000;
-
-  @IsString()
-  @IsOptional()
-  NODE_ENV: string = 'development';
-
-  @IsString()
-  @IsOptional()
-  FRONTEND_URL: string = 'http://localhost:3001';
-
-  @IsString()
-  @IsOptional()
-  REDIS_HOST: string = 'localhost';
+  MAX_LOGIN_ATTEMPTS: number = 5;
 
   @IsNumber()
+  @Transform(({ value }) => parseInt(value, 10))
   @IsOptional()
-  REDIS_PORT: number = 6379;
-
-  @IsString()
-  @IsOptional()
-  REDIS_PASSWORD: string;
-
-  @IsString()
-  @IsOptional()
-  SMTP_HOST: string;
+  RATE_LIMIT_TTL: number = 60000;
 
   @IsNumber()
+  @Transform(({ value }) => parseInt(value, 10))
   @IsOptional()
-  SMTP_PORT: number;
-
-  @IsEmail()
-  @IsOptional()
-  SMTP_USER: string;
+  RATE_LIMIT_MAX: number = 100;
 
   @IsString()
   @IsOptional()
-  SMTP_PASS: string;
+  ENCRYPTION_KEY: string;
 
-  @IsString()
+  @IsBoolean()
+  @Transform(({ value }) => value === 'true')
   @IsOptional()
-  GOOGLE_CLIENT_ID: string;
-
-  @IsString()
-  @IsOptional()
-  GOOGLE_CLIENT_SECRET: string;
-
-  @IsString()
-  @IsOptional()
-  TWILIO_ACCOUNT_SID: string;
-
-  @IsString()
-  @IsOptional()
-  TWILIO_AUTH_TOKEN: string;
-
-  @IsString()
-  @IsOptional()
-  TWILIO_PHONE_NUMBER: string;
+  ENABLE_SWAGGER: boolean = true;
 }
 
 export function validate(config: Record<string, unknown>) {

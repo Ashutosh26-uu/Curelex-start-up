@@ -10,18 +10,19 @@ import { APP_GUARD, APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
+import { ErrorHandlingService } from './common/services/error-handling.service';
 import { validateConstants } from './common/constants/app.constants';
 
 import { AppController } from './app.controller';
 import { PrismaModule } from './common/prisma/prisma.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
+import { CsrfGuard } from './common/guards/csrf.guard';
 
 // Feature Modules
 import { AuthModule } from './modules/auth/auth.module';
 import { PatientModule } from './modules/patient/patient.module';
 import { DoctorModule } from './modules/doctor/doctor.module';
-
 import { AppointmentModule } from './modules/appointment/appointment.module';
 import { VitalsModule } from './modules/vitals/vitals.module';
 import { NotificationModule } from './modules/notification/notification.module';
@@ -29,14 +30,21 @@ import { LoggingModule } from './modules/logging/logging.module';
 import { IntegrationModule } from './modules/integration/integration.module';
 import { WebSocketModule } from './modules/websocket/websocket.module';
 import { PrescriptionModule } from './modules/prescription/prescription.module';
+import { DatabaseModule } from './common/database/database.module';
 
 const globalProviders = [
   { provide: APP_GUARD, useClass: JwtAuthGuard },
   { provide: APP_GUARD, useClass: RolesGuard },
+  { provide: APP_GUARD, useClass: CsrfGuard },
   { provide: APP_GUARD, useClass: ThrottlerGuard },
-  { provide: APP_FILTER, useClass: GlobalExceptionFilter },
+  { 
+    provide: APP_FILTER, 
+    useFactory: (errorHandlingService: ErrorHandlingService) => new GlobalExceptionFilter(errorHandlingService),
+    inject: [ErrorHandlingService]
+  },
   { provide: APP_INTERCEPTOR, useClass: LoggingInterceptor },
   { provide: APP_INTERCEPTOR, useClass: ResponseInterceptor },
+  ErrorHandlingService,
 ];
 
 const createCoreModules = () => {
@@ -59,14 +67,28 @@ const createCoreModules = () => {
         global: true,
         useFactory: (configService: ConfigService) => {
           const secret = configService.get<string>('JWT_SECRET');
-          if (!secret) {
-            throw new Error('JWT_SECRET is required');
+          const refreshSecret = configService.get<string>('JWT_REFRESH_SECRET');
+          
+          if (!secret || !refreshSecret) {
+            throw new Error('JWT_SECRET and JWT_REFRESH_SECRET are required');
           }
+          
+          if (process.env.NODE_ENV === 'production') {
+            if (secret.length < 32 || refreshSecret.length < 32) {
+              throw new Error('JWT secrets must be at least 32 characters in production');
+            }
+            if (secret === refreshSecret) {
+              throw new Error('JWT_SECRET and JWT_REFRESH_SECRET must be different');
+            }
+          }
+          
           return {
             secret,
             signOptions: { 
               expiresIn: configService.get<string>('JWT_EXPIRES_IN', '15m'),
               algorithm: 'HS256',
+              issuer: 'healthcare-platform',
+              audience: 'healthcare-users',
             },
           };
         },
@@ -94,6 +116,7 @@ const createCoreModules = () => {
 };
 
 const featureModules = [
+  DatabaseModule,
   AuthModule,
   PatientModule,
   DoctorModule,

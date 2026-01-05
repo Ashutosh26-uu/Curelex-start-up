@@ -45,7 +45,7 @@ export function Input({
           error && 'border-red-500 focus:ring-red-600 focus:border-red-600',
           className
         )}
-        aria-required={required}
+        aria-required={required ? 'true' : 'false'}
         aria-invalid={error ? 'true' : 'false'}
         aria-describedby={
           error ? errorId : help ? helpId : undefined

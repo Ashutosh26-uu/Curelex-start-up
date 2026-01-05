@@ -16,15 +16,13 @@ export class UnifiedAuthService {
       if (isEmail) {
         return this.authService.patientLogin({ 
           email: identifier, 
-          password,
-          expectedRole: 'PATIENT'
-        }, '', '');
+          password
+        } as any, '', '');
       } else {
         return this.authService.patientLogin({ 
           phone: identifier.startsWith('+91') ? identifier : `+91${identifier}`, 
-          password,
-          expectedRole: 'PATIENT'
-        }, '', '');
+          password
+        } as any, '', '');
       }
     } else if (action === 'signup') {
       // Handle registration

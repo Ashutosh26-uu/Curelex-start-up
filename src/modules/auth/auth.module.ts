@@ -7,6 +7,10 @@ import { AuthService } from './auth.service';
 import { SocialAuthService } from './services/social-auth.service';
 import { UnifiedAuthService } from './services/unified-auth.service';
 import { CaptchaService } from '../../common/services/captcha.service';
+import { TokenBlacklistService } from '../../common/services/token-blacklist.service';
+import { AuthValidationService } from '../../common/services/auth-validation.service';
+import { BusinessLogicService } from '../../common/services/business-logic.service';
+import { ServiceRegistry } from '../../common/services/service-registry.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { LocalStrategy } from './strategies/local.strategy';
 import { PrismaModule } from '../../common/prisma/prisma.module';
@@ -18,13 +22,17 @@ import { NotificationModule } from '../notification/notification.module';
     PassportModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
-      useFactory: async (configService: ConfigService) => ({
-        secret: configService.get<string>('JWT_SECRET'),
-        signOptions: {
-          expiresIn: configService.get<string>('JWT_EXPIRES_IN'),
-        },
-      }),
-      inject: [ConfigService],
+      useFactory: async (configService: ConfigService, jwtConfigService: JwtConfigService) => {
+        const config = jwtConfigService.getJwtConfig();
+        return {
+          secret: config.secret,
+          signOptions: {
+            expiresIn: config.expiresIn,
+            algorithm: 'HS256',
+          },
+        };
+      },
+      inject: [ConfigService, JwtConfigService],
     }),
     NotificationModule,
   ],
@@ -34,16 +42,15 @@ import { NotificationModule } from '../notification/notification.module';
     SocialAuthService, 
     UnifiedAuthService, 
     CaptchaService, 
+    TokenBlacklistService,
+    JwtConfigService,
+    AuthValidationService,
+    ErrorHandlingService,
+    BusinessLogicService,
+    ServiceRegistry,
     JwtStrategy, 
     LocalStrategy,
-    {
-      provide: 'TokenBlacklistService',
-      useValue: {
-        isTokenBlacklisted: () => false,
-        blacklistToken: () => Promise.resolve(),
-      },
-    },
   ],
-  exports: [AuthService],
+  exports: [AuthService, TokenBlacklistService],
 })
 export class AuthModule {}

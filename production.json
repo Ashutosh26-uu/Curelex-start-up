@@ -1,0 +1,16 @@
+{
+  "name": "healthcare-platform",
+  "version": "1.0.0",
+  "main": "dist/main.js",
+  "scripts": {
+    "start": "node dist/main.js",
+    "prestart": "npm run build",
+    "build": "nest build",
+    "migrate": "prisma migrate deploy",
+    "generate": "prisma generate"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  }
+}

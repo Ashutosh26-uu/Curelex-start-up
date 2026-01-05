@@ -8,72 +8,54 @@ import {
 } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
+import { ErrorHandlingService } from '../services/error-handling.service';
 
 @Catch()
 export class GlobalExceptionFilter implements ExceptionFilter {
   private readonly logger = new Logger(GlobalExceptionFilter.name);
 
+  constructor(private errorHandlingService: ErrorHandlingService) {}
+
   catch(exception: unknown, host: ArgumentsHost): void {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request>();
+    const userId = request.user?.['userId'];
 
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
-    let message = 'Internal server error';
-    let error = 'Internal Server Error';
 
     if (exception instanceof HttpException) {
       status = exception.getStatus();
-      const exceptionResponse = exception.getResponse();
-      
-      if (typeof exceptionResponse === 'object') {
-        message = (exceptionResponse as any).message || exception.message;
-        error = (exceptionResponse as any).error || exception.name;
-      } else {
-        message = exceptionResponse;
-        error = exception.name;
-      }
     } else if (exception instanceof PrismaClientKnownRequestError) {
-      status = HttpStatus.BAD_REQUEST;
-      
-      switch (exception.code) {
-        case 'P2002':
-          message = 'A record with this information already exists';
-          error = 'Duplicate Entry';
-          break;
-        case 'P2025':
-          message = 'Record not found';
-          error = 'Not Found';
-          status = HttpStatus.NOT_FOUND;
-          break;
-        case 'P2003':
-          message = 'Foreign key constraint failed';
-          error = 'Constraint Error';
-          break;
-        default:
-          message = 'Database operation failed';
-          error = 'Database Error';
-      }
-    } else if (exception instanceof Error) {
-      message = exception.message;
-      error = exception.name;
+      status = this.getPrismaErrorStatus(exception.code);
     }
 
-    this.logger.error(
-      `${request.method} ${request.url} - ${status} - ${message}`,
-      exception instanceof Error ? exception.stack : exception,
+    // Use centralized error handling
+    const sanitizedError = this.errorHandlingService.sanitizeError(
+      exception,
+      `${request.method} ${request.url}`,
+      userId
     );
 
-    response.status(status).json({
+    const errorResponse = {
+      success: false,
       statusCode: status,
       timestamp: new Date().toISOString(),
       path: request.url,
       method: request.method,
-      error,
-      message,
-      ...(process.env.NODE_ENV === 'development' && {
-        stack: exception instanceof Error ? exception.stack : undefined,
-      }),
-    });
+      message: sanitizedError.message,
+      ...(sanitizedError.code && process.env.NODE_ENV !== 'production' && { code: sanitizedError.code }),
+    };
+
+    response.status(status).json(errorResponse);
+  }
+
+  private getPrismaErrorStatus(code: string): number {
+    const statusMap = {
+      'P2002': HttpStatus.CONFLICT,
+      'P2025': HttpStatus.NOT_FOUND,
+      'P2003': HttpStatus.BAD_REQUEST,
+    };
+    return statusMap[code] || HttpStatus.BAD_REQUEST;
   }
 }

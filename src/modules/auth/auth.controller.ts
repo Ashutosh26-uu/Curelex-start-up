@@ -1,4 +1,4 @@
-import { Controller, Post, Body, UseGuards, Request, HttpCode, HttpStatus, Get, UseInterceptors, UsePipes, ValidationPipe, Res, Headers } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, Request, HttpCode, HttpStatus, Get, UseInterceptors, UsePipes, ValidationPipe, Res, Headers, BadRequestException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
 import { Response } from 'express';
 import { AuthService } from './auth.service';
@@ -31,7 +31,7 @@ export class AuthController {
   @ApiResponse({ status: 429, description: 'Too many requests' })
   @Public()
   @UseInterceptors(LoggingInterceptor)
-  @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
+  @UsePipes(new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }))
   @HttpCode(HttpStatus.OK)
   @Post('login/patient')
   async patientLogin(
@@ -49,6 +49,7 @@ export class AuthController {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('X-Frame-Options', 'DENY');
     res.setHeader('X-XSS-Protection', '1; mode=block');
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
     
     return result;
   }
@@ -59,7 +60,7 @@ export class AuthController {
   @ApiResponse({ status: 429, description: 'Too many requests' })
   @Public()
   @UseInterceptors(LoggingInterceptor)
-  @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
+  @UsePipes(new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }))
   @HttpCode(HttpStatus.OK)
   @Post('login/doctor')
   async doctorLogin(
@@ -77,18 +78,17 @@ export class AuthController {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('X-Frame-Options', 'DENY');
     res.setHeader('X-XSS-Protection', '1; mode=block');
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
     
     return result;
   }
-
-
 
   @ApiOperation({ summary: 'General login endpoint' })
   @ApiResponse({ status: 200, description: 'Login successful' })
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
   @Public()
   @UseInterceptors(LoggingInterceptor)
-  @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
+  @UsePipes(new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }))
   @HttpCode(HttpStatus.OK)
   @Post('login')
   async login(
@@ -106,12 +106,14 @@ export class AuthController {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('X-Frame-Options', 'DENY');
     res.setHeader('X-XSS-Protection', '1; mode=block');
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
     
     return result;
   }
 
   @ApiOperation({ summary: 'User registration' })
   @Public()
+  @UsePipes(new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }))
   @Post('register')
   async register(@Body() registerDto: PatientRegisterDto) {
     return this.authService.register(registerDto);
@@ -119,6 +121,7 @@ export class AuthController {
 
   @ApiOperation({ summary: 'Refresh access token' })
   @Public()
+  @UsePipes(new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }))
   @HttpCode(HttpStatus.OK)
   @Post('refresh')
   async refreshTokens(@Body() refreshTokenDto: RefreshTokenDto) {
@@ -140,8 +143,8 @@ export class AuthController {
     const result = await this.authService.logout(req.user.id, sessionId);
     
     // Clear any client-side cookies if they exist
-    res.clearCookie('access_token');
-    res.clearCookie('refresh_token');
+    res.clearCookie('access_token', { httpOnly: true, secure: true, sameSite: 'strict' });
+    res.clearCookie('refresh_token', { httpOnly: true, secure: true, sameSite: 'strict' });
     
     return result;
   }
@@ -181,6 +184,7 @@ export class AuthController {
 
   @ApiOperation({ summary: 'Forgot password' })
   @Public()
+  @UsePipes(new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }))
   @HttpCode(HttpStatus.OK)
   @Post('forgot-password')
   async forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto) {
@@ -189,6 +193,7 @@ export class AuthController {
 
   @ApiOperation({ summary: 'Reset password' })
   @Public()
+  @UsePipes(new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }))
   @HttpCode(HttpStatus.OK)
   @Post('reset-password')
   async resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
@@ -198,6 +203,7 @@ export class AuthController {
   @ApiOperation({ summary: 'Change password' })
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
+  @UsePipes(new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }))
   @HttpCode(HttpStatus.OK)
   @Post('change-password')
   async changePassword(@Request() req: any, @Body() changePasswordDto: ChangePasswordDto) {
@@ -209,7 +215,7 @@ export class AuthController {
   @ApiResponse({ status: 400, description: 'Registration failed - validation errors' })
   @ApiResponse({ status: 409, description: 'User already exists' })
   @Public()
-  @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
+  @UsePipes(new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }))
   @Post('register/patient')
   async registerPatient(
     @Body() patientRegisterDto: PatientRegisterDto, 
@@ -226,20 +232,20 @@ export class AuthController {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('X-Frame-Options', 'DENY');
     res.setHeader('X-XSS-Protection', '1; mode=block');
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
     
     return result;
   }
 
   @ApiOperation({ summary: 'Doctor registration (Junior/Senior)' })
   @Public()
+  @UsePipes(new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }))
   @Post('register/doctor')
   async registerDoctor(@Body() doctorRegisterDto: any, @Request() req: any) {
     const ipAddress = req.ip || req.connection.remoteAddress;
     const userAgent = req.get('User-Agent');
     return this.authService.registerDoctor(doctorRegisterDto, ipAddress, userAgent);
   }
-
-
 
   @ApiOperation({ summary: 'Auto refresh token if near expiry' })
   @ApiBearerAuth()
@@ -283,6 +289,7 @@ export class AuthController {
   @ApiOperation({ summary: 'Validate captcha' })
   @ApiResponse({ status: 200, description: 'Captcha validation result' })
   @Public()
+  @UsePipes(new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }))
   @HttpCode(HttpStatus.OK)
   @Post('captcha/validate')
   async validateCaptcha(@Body() { captchaId, captchaValue }: { captchaId: string; captchaValue: string }) {
@@ -292,6 +299,7 @@ export class AuthController {
 
   @ApiOperation({ summary: 'Phone/Email login' })
   @Public()
+  @UsePipes(new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }))
   @HttpCode(HttpStatus.OK)
   @Post('login/phone-email')
   async loginWithPhoneOrEmail(@Body() loginDto: any, @Request() req: any) {
@@ -304,6 +312,7 @@ export class AuthController {
   @ApiResponse({ status: 200, description: 'Authentication successful' })
   @ApiResponse({ status: 400, description: 'Validation failed' })
   @Public()
+  @UsePipes(new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }))
   @HttpCode(HttpStatus.OK)
   @Post('unified')
   async unifiedAuth(@Body() unifiedAuthDto: UnifiedAuthDto) {
@@ -314,6 +323,7 @@ export class AuthController {
   @ApiResponse({ status: 200, description: 'Social login successful' })
   @ApiResponse({ status: 401, description: 'Invalid social token' })
   @Public()
+  @UsePipes(new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }))
   @HttpCode(HttpStatus.OK)
   @Post('social')
   async socialLogin(@Body() socialLoginDto: SocialLoginDto) {
@@ -327,9 +337,14 @@ export class AuthController {
 
   @ApiOperation({ summary: 'Check if user exists by email or phone' })
   @Public()
+  @UsePipes(new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }))
   @HttpCode(HttpStatus.OK)
   @Post('check-user')
   async checkUser(@Body() { identifier }: { identifier: string }) {
+    if (!identifier || typeof identifier !== 'string') {
+      throw new BadRequestException('Valid identifier is required');
+    }
+    
     const isEmail = identifier.includes('@');
     const user = await this.authService.findUserByIdentifier(identifier, isEmail);
     return { exists: !!user, hasPassword: user?.password ? true : false };

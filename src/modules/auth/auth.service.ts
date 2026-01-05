@@ -1,12 +1,16 @@
-import { Injectable, UnauthorizedException, BadRequestException, ConflictException, ForbiddenException, Logger } from '@nestjs/common';
+import { Injectable, UnauthorizedException, BadRequestException, ConflictException, ForbiddenException, Logger, Inject } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcryptjs';
-import { PrismaService } from '../../common/prisma/prisma.service';
-import { CaptchaService } from '../../common/services/captcha.service';
+import { DatabaseService } from '../../common/database/database.service';
+import { AuthValidationService } from '../../common/services/auth-validation.service';
+import { ErrorHandlingService } from '../../common/services/error-handling.service';
+import { BusinessLogicService } from '../../common/services/business-logic.service';
+import { IAuthService, INotificationService } from '../../common/interfaces/service.interfaces';
+import { ServiceRegistry } from '../../common/services/service-registry.service';
+import { ValidationUtils } from '../../common/utils/validation.utils';
 import { LoginDto, PatientLoginDto, DoctorLoginDto } from './dto/login.dto';
 import { PatientRegisterDto } from './dto/patient-register.dto';
-
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
@@ -15,21 +19,43 @@ import { UserRole } from '../../common/enums/user-role.enum';
 import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
-export class AuthService {
+export class AuthService implements IAuthService {
   private readonly logger = new Logger(AuthService.name);
 
   constructor(
-    private prisma: PrismaService,
+    private prisma: DatabaseService,
     private jwtService: JwtService,
     private configService: ConfigService,
-    private captchaService: CaptchaService,
-  ) {}
+    private authValidationService: AuthValidationService,
+    private errorHandlingService: ErrorHandlingService,
+    private businessLogicService: BusinessLogicService,
+    private serviceRegistry: ServiceRegistry,
+  ) {
+    // Register this service to prevent circular dependencies
+    this.serviceRegistry.registerService(ServiceRegistry.AUTH_SERVICE, this);
+  }
+
+  async validateUser(email: string, password: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { email: email.toLowerCase() },
+      include: { profile: true, patient: true, doctor: true, officer: true },
+    });
+
+    if (user && await bcrypt.compare(password, user.password)) {
+      const { password, ...result } = user;
+      return result;
+    }
+    return null;
+  }
 
   async patientRegister(registerDto: PatientRegisterDto, ipAddress?: string, userAgent?: string) {
-    // Validate password confirmation
-    if (registerDto.password !== registerDto.confirmPassword) {
-      throw new BadRequestException('Passwords do not match');
-    }
+    // Centralized validation
+    const { normalizedPhone } = this.authValidationService.validateRegistrationData({
+      email: registerDto.email,
+      password: registerDto.password,
+      confirmPassword: registerDto.confirmPassword,
+      phone: registerDto.phone,
+    });
 
     // Check if user already exists
     const existingUser = await this.prisma.user.findUnique({
@@ -42,7 +68,7 @@ export class AuthService {
 
     // Check if phone number is already used
     const existingPhone = await this.prisma.profile.findFirst({
-      where: { phone: registerDto.phone }
+      where: { phone: normalizedPhone }
     });
 
     if (existingPhone) {
@@ -50,14 +76,15 @@ export class AuthService {
     }
 
     try {
-      // Hash password
-      const hashedPassword = await bcrypt.hash(registerDto.password, 12);
+      // Hash password with higher rounds for better security
+      const hashedPassword = await bcrypt.hash(registerDto.password, 14);
       
-      // Generate unique patient ID
-      const patientId = `PAT${Date.now()}${Math.random().toString(36).substr(2, 4).toUpperCase()}`;
+      // Generate unique patient ID using business logic
+      const patientId = this.businessLogicService.generatePatientId();
+      const statusRules = this.businessLogicService.getPatientStatusRules();
 
       // Create user and profile in transaction
-      const result = await this.prisma.$transaction(async (tx) => {
+      const result = await this.prisma.safeTransaction(async (tx) => {
         // Create user
         const user = await tx.user.create({
           data: {
@@ -76,7 +103,7 @@ export class AuthService {
             userId: user.id,
             firstName: registerDto.firstName,
             lastName: registerDto.lastName,
-            phone: registerDto.phone,
+            phone: normalizedPhone,
             dateOfBirth: registerDto.dateOfBirth ? new Date(registerDto.dateOfBirth) : null,
             gender: registerDto.gender,
             address: registerDto.address,
@@ -91,7 +118,7 @@ export class AuthService {
           data: {
             userId: user.id,
             patientId,
-            status: 'ACTIVE',
+            status: statusRules.defaultStatus,
           }
         });
 
@@ -112,40 +139,38 @@ export class AuthService {
       };
 
     } catch (error) {
-      this.logger.error(`Registration failed for ${registerDto.email}:`, error.message);
-      throw new BadRequestException('Registration failed. Please try again.');
+      const errorResponse = this.errorHandlingService.createSafeErrorResponse(
+        error,
+        'Patient Registration',
+        undefined
+      );
+      throw new BadRequestException(errorResponse.error.message);
     }
   }
 
   async patientLogin(loginDto: PatientLoginDto, ipAddress?: string, userAgent?: string) {
-    // Handle both email and phone login
+    // Centralized validation
+    const { normalizedPhone } = this.authValidationService.validateLoginCredentials(
+      loginDto.email,
+      loginDto.phone,
+      loginDto.password
+    );
+
+    // Find user by email or phone
     let user;
-    
     if (loginDto.email) {
       user = await this.prisma.user.findUnique({
         where: { email: loginDto.email.toLowerCase() },
-        include: {
-          profile: true,
-          patient: true,
-          doctor: true,
-          officer: true,
-        }
+        include: { profile: true, patient: true, doctor: true, officer: true }
       });
-    } else if (loginDto.phone) {
+    } else if (normalizedPhone) {
       user = await this.prisma.user.findFirst({
         where: { 
-          profile: { phone: loginDto.phone },
+          profile: { phone: normalizedPhone },
           role: UserRole.PATIENT 
         },
-        include: {
-          profile: true,
-          patient: true,
-          doctor: true,
-          officer: true,
-        }
+        include: { profile: true, patient: true, doctor: true, officer: true }
       });
-    } else {
-      throw new BadRequestException('Email or phone number is required');
     }
 
     if (!user) {
@@ -153,36 +178,53 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    // Check if user is active
+    // Check captcha if required
+    const shouldRequireCaptcha = this.authValidationService.shouldRequireCaptcha(user.failedLoginAttempts, ipAddress);
+    await this.authValidationService.validateCaptcha(loginDto.captchaId, loginDto.captchaValue, shouldRequireCaptcha);
+
+    return this.processLogin(user, loginDto.password, UserRole.PATIENT, ipAddress, userAgent);
+  }
+
+  async doctorLogin(loginDto: DoctorLoginDto, ipAddress?: string, userAgent?: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { email: loginDto.email.toLowerCase() },
+      include: {
+        profile: true,
+        patient: true,
+        doctor: true,
+        officer: true,
+      }
+    });
+
+    if (!user) {
+      await this.logFailedLogin(loginDto.email, 'User not found', ipAddress, userAgent);
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
     if (!user.isActive) {
       await this.logFailedLogin(user.email, 'Account inactive', ipAddress, userAgent);
       throw new UnauthorizedException('Account is inactive. Please contact support.');
     }
 
-    // Check if account is locked
     if (user.isLocked) {
       await this.logFailedLogin(user.email, 'Account locked', ipAddress, userAgent);
       throw new UnauthorizedException(`Account is locked. Reason: ${user.lockReason || 'Security violation'}`);
     }
 
-    // Verify password
     const isPasswordValid = await bcrypt.compare(loginDto.password, user.password);
     if (!isPasswordValid) {
       await this.handleFailedLogin(user.id, user.email, ipAddress, userAgent);
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    // Check role
-    if (user.role !== UserRole.PATIENT) {
+    if (user.role !== UserRole.DOCTOR) {
       await this.logFailedLogin(user.email, 'Invalid role access', ipAddress, userAgent);
-      throw new ForbiddenException('Access denied. This login is for patients only.');
+      throw new ForbiddenException('Access denied. This login is for doctors only.');
     }
 
-    // Generate session and tokens
     const sessionId = uuidv4();
     const tokens = await this.generateTokens(user.id, user.email, user.role, sessionId);
 
-    // Update user login info
     await this.prisma.$transaction(async (tx) => {
       await tx.user.update({
         where: { id: user.id },
@@ -218,14 +260,14 @@ export class AuthService {
       });
     });
 
-    this.logger.log(`Successful patient login: ${user.email}`);
+    this.logger.log(`Successful doctor login: ${user.email}`);
 
     const userData = {
       id: user.id,
       email: user.email,
       role: user.role,
       profile: user.profile,
-      patient: user.patient,
+      doctor: user.doctor,
     };
 
     return {
@@ -237,29 +279,15 @@ export class AuthService {
     };
   }
 
-  async doctorLogin(loginDto: DoctorLoginDto, ipAddress?: string, userAgent?: string) {
-    return this.login({ ...loginDto, expectedRole: UserRole.DOCTOR }, ipAddress, userAgent);
-  }
-
   async login(loginDto: LoginDto & { expectedRole?: string }, ipAddress?: string, userAgent?: string) {
     try {
-      // Validate captcha if provided
-      if (loginDto.captchaId && loginDto.captchaValue) {
-        const isCaptchaValid = this.captchaService.validateCaptcha(loginDto.captchaId, loginDto.captchaValue);
-        if (!isCaptchaValid) {
-          await this.logFailedLogin(loginDto.email, 'Invalid captcha', ipAddress, userAgent);
-          throw new BadRequestException('Invalid captcha. Please try again.');
-        }
-      }
-      // Find user with profile and role-specific data
+      // Centralized validation
+      this.authValidationService.validateLoginCredentials(loginDto.email, undefined, loginDto.password);
+
+      // Find user
       const user = await this.prisma.user.findUnique({
         where: { email: loginDto.email.toLowerCase() },
-        include: {
-          profile: true,
-          patient: true,
-          doctor: true,
-          officer: true,
-        }
+        include: { profile: true, patient: true, doctor: true, officer: true }
       });
 
       if (!user) {
@@ -267,108 +295,29 @@ export class AuthService {
         throw new UnauthorizedException('Invalid email or password');
       }
 
-      // Check if user is active
-      if (!user.isActive) {
-        await this.logFailedLogin(loginDto.email, 'Account inactive', ipAddress, userAgent);
-        throw new UnauthorizedException('Account is inactive. Please contact support.');
-      }
+      // Check captcha if required
+      const shouldRequireCaptcha = this.authValidationService.shouldRequireCaptcha(user.failedLoginAttempts, ipAddress);
+      await this.authValidationService.validateCaptcha(loginDto.captchaId, loginDto.captchaValue, shouldRequireCaptcha);
 
-      // Check if account is locked
-      if (user.isLocked) {
-        await this.logFailedLogin(loginDto.email, 'Account locked', ipAddress, userAgent);
-        throw new UnauthorizedException(`Account is locked. Reason: ${user.lockReason || 'Security violation'}`);
-      }
-
-      // Verify password
-      const isPasswordValid = await bcrypt.compare(loginDto.password, user.password);
-      if (!isPasswordValid) {
-        await this.handleFailedLogin(user.id, loginDto.email, ipAddress, userAgent);
-        throw new UnauthorizedException('Invalid email or password');
-      }
-
-      // Check role if specified
-      if (loginDto.expectedRole && user.role !== loginDto.expectedRole) {
-        await this.logFailedLogin(loginDto.email, 'Invalid role access', ipAddress, userAgent);
-        throw new ForbiddenException(`Access denied. This login is for ${loginDto.expectedRole} users only.`);
-      }
-
-      // Generate session and tokens
-      const sessionId = uuidv4();
-      const tokens = await this.generateTokens(user.id, user.email, user.role, sessionId);
-
-      // Update user login info
-      await this.prisma.$transaction(async (tx) => {
-        // Reset failed login attempts
-        await tx.user.update({
-          where: { id: user.id },
-          data: {
-            failedLoginAttempts: 0,
-            lastFailedLoginAt: null,
-            lastLoginAt: new Date(),
-            loginCount: { increment: 1 },
-            sessionId,
-            ipAddress,
-            userAgent,
-          }
-        });
-
-        // Create session record
-        await tx.userSession.create({
-          data: {
-            userId: user.id,
-            sessionId,
-            ipAddress,
-            userAgent,
-            expiresAt: new Date(Date.now() + (loginDto.rememberMe ? 30 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000)),
-          }
-        });
-
-        // Log successful login
-        await tx.loginHistory.create({
-          data: {
-            userId: user.id,
-            email: user.email,
-            success: true,
-            ipAddress,
-            userAgent,
-          }
-        });
-      });
-
-      this.logger.log(`Successful login: ${user.email} (${user.role})`);
-
-      // Prepare user data based on role
-      const userData = {
-        id: user.id,
-        email: user.email,
-        role: user.role,
-        profile: user.profile,
-        ...(user.patient && { patient: user.patient }),
-        ...(user.doctor && { doctor: user.doctor }),
-        ...(user.officer && { officer: user.officer }),
-      };
-
-      return {
-        success: true,
-        message: 'Login successful',
-        data: {
-          user: userData,
-          tokens,
-          sessionId,
-        }
-      };
+      return this.processLogin(user, loginDto.password, loginDto.expectedRole, ipAddress, userAgent, loginDto.rememberMe);
 
     } catch (error) {
       if (error instanceof UnauthorizedException || error instanceof ForbiddenException) {
         throw error;
       }
-      this.logger.error(`Login error for ${loginDto.email}:`, error.message);
-      throw new BadRequestException('Login failed. Please try again.');
+      const errorResponse = this.errorHandlingService.createSafeErrorResponse(
+        error,
+        'Login Process',
+        undefined
+      );
+      throw new BadRequestException(errorResponse.error.message);
     }
   }
 
   async generateTokens(userId: string, email: string, role: string, sessionId: string) {
-    const jti = uuidv4(); // JWT ID for token tracking
+    const jti = uuidv4();
+    const tokenConfig = this.businessLogicService.getTokenConfiguration();
+    
     const payload = { 
       sub: userId, 
       email, 
@@ -379,18 +328,18 @@ export class AuthService {
     };
 
     const accessToken = await this.jwtService.signAsync(payload, {
-      expiresIn: this.configService.get('JWT_EXPIRES_IN', '15m'),
+      expiresIn: tokenConfig.accessTokenExpiry,
     });
 
     const refreshToken = await this.jwtService.signAsync(payload, {
       secret: this.configService.get('JWT_REFRESH_SECRET'),
-      expiresIn: this.configService.get('JWT_REFRESH_EXPIRES_IN', '7d'),
+      expiresIn: tokenConfig.refreshTokenExpiry,
     });
 
-    // Store refresh token
+    // Store refresh token with higher security
     await this.prisma.user.update({
       where: { id: userId },
-      data: { refreshToken: await bcrypt.hash(refreshToken, 10) }
+      data: { refreshToken: await bcrypt.hash(refreshToken, 12) }
     });
 
     return { accessToken, refreshToken };
@@ -422,17 +371,14 @@ export class AuthService {
   }
 
   async logout(userId: string, sessionId: string, jti?: string) {
-    await this.prisma.$transaction(async (tx) => {
+    await this.prisma.safeTransaction(async (tx) => {
       // Blacklist current token if JTI provided
       if (jti) {
-        await tx.auditLog.create({
-          data: {
-            userId,
-            action: 'TOKEN_BLACKLISTED',
-            resource: 'JWT',
-            details: JSON.stringify({ jti, reason: 'logout' })
-          }
-        });
+        const tokenBlacklistService = new (await import('../../common/services/token-blacklist.service')).TokenBlacklistService(
+          this.prisma,
+          this.configService
+        );
+        await tokenBlacklistService.blacklistToken(jti, userId, 'logout');
       }
 
       // Clear refresh token
@@ -456,7 +402,7 @@ export class AuthService {
   }
 
   async logoutAllSessions(userId: string) {
-    await this.prisma.$transaction(async (tx) => {
+    await this.prisma.safeTransaction(async (tx) => {
       await tx.user.update({
         where: { id: userId },
         data: { 
@@ -476,7 +422,7 @@ export class AuthService {
   }
 
   private async handleFailedLogin(userId: string, email: string, ipAddress?: string, userAgent?: string) {
-    const maxAttempts = this.configService.get<number>('MAX_LOGIN_ATTEMPTS', 5);
+    const loginLimits = this.businessLogicService.getLoginAttemptLimits();
     
     const user = await this.prisma.user.update({
       where: { id: userId },
@@ -487,12 +433,13 @@ export class AuthService {
     });
 
     // Lock account if max attempts reached
-    if (user.failedLoginAttempts >= maxAttempts) {
+    if (user.failedLoginAttempts >= loginLimits.maxAttempts) {
       await this.prisma.user.update({
         where: { id: userId },
         data: {
           isLocked: true,
           lockReason: 'Too many failed login attempts',
+          accountLockUntil: new Date(Date.now() + loginLimits.lockoutDuration),
         }
       });
     }
@@ -501,15 +448,19 @@ export class AuthService {
   }
 
   private async logFailedLogin(email: string, reason: string, ipAddress?: string, userAgent?: string) {
-    await this.prisma.loginHistory.create({
-      data: {
-        email,
-        success: false,
-        failReason: reason,
-        ipAddress,
-        userAgent,
-      }
-    });
+    try {
+      await this.prisma.loginHistory.create({
+        data: {
+          email,
+          success: false,
+          failReason: reason,
+          ipAddress,
+          userAgent,
+        }
+      });
+    } catch (error) {
+      this.errorHandlingService.logError(error, 'Failed Login Logging');
+    }
   }
 
   async register(registerDto: PatientRegisterDto) {
@@ -581,3 +532,96 @@ export class AuthService {
     }
   }
 }
+  private async processLogin(
+    user: any,
+    password: string,
+    expectedRole?: string,
+    ipAddress?: string,
+    userAgent?: string,
+    rememberMe = false
+  ) {
+    // Check if user is active
+    if (!user.isActive) {
+      await this.logFailedLogin(user.email, 'Account inactive', ipAddress, userAgent);
+      throw new UnauthorizedException('Account is inactive. Please contact support.');
+    }
+
+    // Check if account is locked
+    if (user.isLocked) {
+      await this.logFailedLogin(user.email, 'Account locked', ipAddress, userAgent);
+      throw new UnauthorizedException(`Account is locked. Reason: ${user.lockReason || 'Security violation'}`);
+    }
+
+    // Verify password
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) {
+      await this.handleFailedLogin(user.id, user.email, ipAddress, userAgent);
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    // Check role if specified
+    if (expectedRole && user.role !== expectedRole) {
+      await this.logFailedLogin(user.email, 'Invalid role access', ipAddress, userAgent);
+      throw new ForbiddenException(`Access denied. This login is for ${expectedRole} users only.`);
+    }
+
+    // Generate session and tokens
+    const sessionId = uuidv4();
+    const tokens = await this.generateTokens(user.id, user.email, user.role, sessionId);
+
+    // Update user login info
+    await this.prisma.safeTransaction(async (tx) => {
+      await tx.user.update({
+        where: { id: user.id },
+        data: {
+          failedLoginAttempts: 0,
+          lastFailedLoginAt: null,
+          lastLoginAt: new Date(),
+          loginCount: { increment: 1 },
+          sessionId,
+          ipAddress,
+          userAgent,
+        }
+      });
+
+      await tx.userSession.create({
+        data: {
+          userId: user.id,
+          sessionId,
+          ipAddress,
+          userAgent,
+          expiresAt: new Date(Date.now() + (rememberMe ? 30 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000)),
+        }
+      });
+
+      await tx.loginHistory.create({
+        data: {
+          userId: user.id,
+          email: user.email,
+          success: true,
+          ipAddress,
+          userAgent,
+        }
+      });
+    });
+
+    this.logger.log(`Successful login: ${user.email} (${user.role})`);
+
+    const userData = {
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      profile: user.profile,
+      ...(user.patient && { patient: user.patient }),
+      ...(user.doctor && { doctor: user.doctor }),
+      ...(user.officer && { officer: user.officer }),
+    };
+
+    return {
+      success: true,
+      message: 'Login successful',
+      user: userData,
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+    };
+  }

@@ -159,6 +159,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
               onClick={() => setSidebarOpen(true)}
               className="lg:hidden p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-colors"
               aria-label="Open sidebar"
+              title="Open sidebar"
             >
               <Menu className="w-6 h-6" />
             </button>
