@@ -17,7 +17,11 @@ import { ResetPasswordDto } from './dto/reset-password.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { UserRole } from '../../common/enums/user-role.enum';
+import { TwoFactorService } from './services/two-factor.service';
+import { RateLimitService } from './services/rate-limit.service';
+import { SessionManagementService } from './services/session-management.service';
 import { v4 as uuidv4 } from 'uuid';
+import * as crypto from 'crypto';
 
 @Injectable()
 export class AuthService implements IAuthService {
@@ -32,6 +36,9 @@ export class AuthService implements IAuthService {
     private businessLogicService: BusinessLogicService,
     private serviceRegistry: ServiceRegistry,
     private queryOptimizationService: QueryOptimizationService,
+    private twoFactorService: TwoFactorService,
+    private rateLimitService: RateLimitService,
+    private sessionManagementService: SessionManagementService,
   ) {
     // Register this service to prevent circular dependencies
     this.serviceRegistry.registerService(ServiceRegistry.AUTH_SERVICE, this);
@@ -148,6 +155,12 @@ export class AuthService implements IAuthService {
   }
 
   async patientLogin(loginDto: PatientLoginDto, ipAddress?: string, userAgent?: string) {
+    // Check rate limits
+    const rateLimitResult = await this.rateLimitService.checkAdvancedRateLimit(ipAddress, undefined, 'login');
+    if (!rateLimitResult.allowed) {
+      throw new UnauthorizedException(`Login temporarily blocked: ${rateLimitResult.reason}`);
+    }
+
     // Centralized validation
     const { normalizedPhone } = this.authValidationService.validateLoginCredentials(
       loginDto.email,
@@ -164,6 +177,7 @@ export class AuthService implements IAuthService {
     }
 
     if (!user) {
+      await this.rateLimitService.recordFailedLogin(ipAddress);
       await this.logFailedLogin(loginDto.email || loginDto.phone, 'User not found', ipAddress, userAgent);
       throw new UnauthorizedException('Invalid credentials');
     }
@@ -172,7 +186,7 @@ export class AuthService implements IAuthService {
     const shouldRequireCaptcha = this.authValidationService.shouldRequireCaptcha(user.failedLoginAttempts, ipAddress);
     await this.authValidationService.validateCaptcha(loginDto.captchaId, loginDto.captchaValue, shouldRequireCaptcha);
 
-    return this.processLogin(user, loginDto.password, UserRole.PATIENT, ipAddress, userAgent);
+    return this.processLogin(user, loginDto.password, UserRole.PATIENT, ipAddress, userAgent, loginDto.twoFactorToken);
   }
 
   async doctorLogin(loginDto: DoctorLoginDto, ipAddress?: string, userAgent?: string) {
@@ -301,44 +315,65 @@ export class AuthService implements IAuthService {
     }
   }
 
-  async generateTokens(userId: string, email: string, role: string, sessionId: string) {
-    const jti = uuidv4();
-    const tokenConfig = this.businessLogicService.getTokenConfiguration();
-    
-    const payload = { 
-      sub: userId, 
-      email, 
-      role, 
-      sessionId,
-      jti,
-      iat: Math.floor(Date.now() / 1000)
-    };
+  async generateTokens(userId: string, email: string, role: string, sessionId: string, deviceFingerprint?: string) {
+    return await this.prisma.safeTransaction(async (tx) => {
+      const user = await tx.user.findUnique({ where: { id: userId } });
+      if (!user) throw new UnauthorizedException('User not found');
 
-    const accessToken = await this.jwtService.signAsync(payload, {
-      expiresIn: tokenConfig.accessTokenExpiry,
+      const jti = uuidv4();
+      const refreshJti = uuidv4();
+      const tokenVersion = user.refreshTokenVersion + 1;
+      const tokenConfig = this.businessLogicService.getTokenConfiguration();
+      
+      const payload = { 
+        sub: userId, 
+        email, 
+        role, 
+        sessionId,
+        jti,
+        ver: tokenVersion,
+        dev: deviceFingerprint ? crypto.createHash('sha256').update(deviceFingerprint).digest('hex').substring(0, 16) : undefined,
+        iat: Math.floor(Date.now() / 1000)
+      };
+
+      const refreshPayload = {
+        ...payload,
+        jti: refreshJti,
+        type: 'refresh'
+      };
+
+      const [accessToken, refreshToken] = await Promise.all([
+        this.jwtService.signAsync(payload, { expiresIn: tokenConfig.accessTokenExpiry }),
+        this.jwtService.signAsync(refreshPayload, {
+          secret: this.configService.get('JWT_REFRESH_SECRET'),
+          expiresIn: tokenConfig.refreshTokenExpiry,
+        })
+      ]);
+
+      const refreshTokenHash = await bcrypt.hash(refreshToken, 12);
+      const refreshTokenFamily = crypto.randomUUID();
+      
+      await tx.user.update({
+        where: { id: userId },
+        data: { 
+          refreshToken: refreshTokenHash,
+          refreshTokenFamily,
+          refreshTokenVersion: tokenVersion,
+          deviceFingerprint
+        }
+      });
+
+      return { accessToken, refreshToken, refreshTokenFamily, tokenVersion };
     });
-
-    const refreshToken = await this.jwtService.signAsync(payload, {
-      secret: this.configService.get('JWT_REFRESH_SECRET'),
-      expiresIn: tokenConfig.refreshTokenExpiry,
-    });
-
-    // Store refresh token with higher security
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: { refreshToken: await bcrypt.hash(refreshToken, 12) }
-    });
-
-    return { accessToken, refreshToken };
   }
 
-  async refreshTokens(refreshTokenDto: RefreshTokenDto) {
-    try {
+  async refreshTokens(refreshTokenDto: RefreshTokenDto, deviceFingerprint?: string) {
+    return await this.prisma.safeTransaction(async (tx) => {
       const payload = await this.jwtService.verifyAsync(refreshTokenDto.refreshToken, {
         secret: this.configService.get('JWT_REFRESH_SECRET'),
       });
 
-      const user = await this.prisma.user.findUnique({
+      const user = await tx.user.findUnique({
         where: { id: payload.sub }
       });
 
@@ -346,15 +381,41 @@ export class AuthService implements IAuthService {
         throw new UnauthorizedException('Invalid refresh token');
       }
 
+      // Verify refresh token and detect reuse
       const isRefreshTokenValid = await bcrypt.compare(refreshTokenDto.refreshToken, user.refreshToken);
       if (!isRefreshTokenValid) {
+        // Token reuse detected - invalidate all sessions
+        await this.sessionManagementService.invalidateAllUserSessions(user.id);
+        await this.sessionManagementService.handleSecurityEvent({
+          type: 'SUSPICIOUS_ACTIVITY',
+          userId: user.id,
+          metadata: { reason: 'Refresh token reuse detected' }
+        });
         throw new UnauthorizedException('Invalid refresh token');
       }
 
-      return this.generateTokens(user.id, user.email, user.role, payload.sessionId);
-    } catch (error) {
-      throw new UnauthorizedException('Invalid refresh token');
-    }
+      // Validate token type and version
+      if (payload.type !== 'refresh') {
+        throw new UnauthorizedException('Invalid token type');
+      }
+
+      if (payload.ver && user.refreshTokenVersion !== payload.ver) {
+        throw new UnauthorizedException('Token version mismatch');
+      }
+
+      // Generate new tokens with rotation
+      const newTokens = await this.generateTokens(
+        user.id, 
+        user.email, 
+        user.role, 
+        payload.sessionId,
+        deviceFingerprint
+      );
+      
+      this.logger.log(`Token refreshed for user: ${user.email}`);
+      
+      return newTokens;
+    });
   }
 
   async logout(userId: string, sessionId: string, jti?: string) {
@@ -374,24 +435,19 @@ export class AuthService implements IAuthService {
         data: { 
           refreshToken: null,
           sessionId: null,
-          lastLogoutAt: new Date()
+          lastLogoutAt: new Date(),
+          refreshTokenFamily: null,
         }
       });
+    });
 
-      // Deactivate current session instead of keeping it
-      await tx.userSession.updateMany({
-        where: { userId, sessionId },
-        data: { isActive: false }
-      });
+    // Invalidate session
+    await this.sessionManagementService.invalidateSession(sessionId);
 
-      // Clean up old inactive sessions for this user
-      await tx.userSession.deleteMany({
-        where: {
-          userId,
-          isActive: false,
-          createdAt: { lt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } // 7 days old
-        }
-      });
+    // Handle security event
+    await this.sessionManagementService.handleSecurityEvent({
+      type: 'LOGOUT',
+      userId
     });
 
     // Invalidate user cache
@@ -407,20 +463,61 @@ export class AuthService implements IAuthService {
         data: { 
           refreshToken: null,
           sessionId: null,
-          lastLogoutAt: new Date()
+          lastLogoutAt: new Date(),
+          refreshTokenFamily: null,
+          refreshTokenVersion: { increment: 1 }
         }
       });
+    });
 
-      // Delete all sessions for this user instead of just deactivating
-      await tx.userSession.deleteMany({
-        where: { userId }
-      });
+    // Invalidate all sessions
+    await this.sessionManagementService.invalidateAllUserSessions(userId);
+
+    // Handle security event
+    await this.sessionManagementService.handleSecurityEvent({
+      type: 'LOGOUT',
+      userId,
+      metadata: { type: 'all_sessions' }
     });
 
     // Invalidate user cache
     await this.queryOptimizationService.invalidateUserCache(userId);
 
     return { success: true, message: 'Logged out from all sessions' };
+  }
+
+  // 2FA Methods
+  async setup2FA(userId: string) {
+    return this.twoFactorService.generateTwoFactorSecret(userId);
+  }
+
+  async enable2FA(userId: string, token: string) {
+    const result = await this.twoFactorService.enableTwoFactor(userId, token);
+    
+    await this.sessionManagementService.handleSecurityEvent({
+      type: 'PASSWORD_CHANGE', // Using closest available type
+      userId,
+      metadata: { action: '2FA_ENABLED' }
+    });
+    
+    return result;
+  }
+
+  async disable2FA(userId: string, token: string) {
+    const result = await this.twoFactorService.disableTwoFactor(userId, token);
+    
+    await this.sessionManagementService.handleSecurityEvent({
+      type: 'PASSWORD_CHANGE',
+      userId,
+      metadata: { action: '2FA_DISABLED' }
+    });
+    
+    return result;
+  }
+
+  private async generateTempToken(userId: string): Promise<string> {
+    const payload = { sub: userId, type: 'temp', exp: Math.floor(Date.now() / 1000) + 300 }; // 5 minutes
+    return this.jwtService.signAsync(payload);
   }
 
   private async handleFailedLogin(userId: string, email: string, ipAddress?: string, userAgent?: string) {
@@ -443,6 +540,15 @@ export class AuthService implements IAuthService {
           lockReason: 'Too many failed login attempts',
           accountLockUntil: new Date(Date.now() + loginLimits.lockoutDuration),
         }
+      });
+
+      // Handle security event for account lock
+      await this.sessionManagementService.handleSecurityEvent({
+        type: 'ACCOUNT_LOCKED',
+        userId,
+        ipAddress,
+        userAgent,
+        metadata: { reason: 'Too many failed login attempts' }
       });
     }
 
@@ -559,10 +665,12 @@ export class AuthService implements IAuthService {
     expectedRole?: string,
     ipAddress?: string,
     userAgent?: string,
+    twoFactorToken?: string,
     rememberMe = false
   ) {
     // Check if user is active
     if (!user.isActive) {
+      await this.rateLimitService.recordFailedLogin(ipAddress, user.id);
       await this.logFailedLogin(user.email, 'Account inactive', ipAddress, userAgent);
       throw new UnauthorizedException('Account is inactive. Please contact support.');
     }
@@ -576,8 +684,27 @@ export class AuthService implements IAuthService {
     // Verify password
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
+      await this.rateLimitService.recordFailedLogin(ipAddress, user.id);
       await this.handleFailedLogin(user.id, user.email, ipAddress, userAgent);
       throw new UnauthorizedException('Invalid credentials');
+    }
+
+    // Check 2FA if enabled
+    if (user.isTwoFactorEnabled) {
+      if (!twoFactorToken) {
+        return {
+          success: false,
+          requiresTwoFactor: true,
+          message: 'Two-factor authentication required',
+          tempToken: await this.generateTempToken(user.id)
+        };
+      }
+
+      const is2FAValid = await this.twoFactorService.verifyTwoFactor(user.id, twoFactorToken);
+      if (!is2FAValid) {
+        await this.rateLimitService.recordFailedLogin(ipAddress, user.id);
+        throw new UnauthorizedException('Invalid two-factor authentication code');
+      }
     }
 
     // Check role if specified
@@ -586,20 +713,45 @@ export class AuthService implements IAuthService {
       throw new ForbiddenException(`Access denied. This login is for ${expectedRole} users only.`);
     }
 
+    // Check for concurrent sessions
+    await this.sessionManagementService.detectConcurrentSessions(user.id);
+
     // Generate session and tokens
-    const sessionId = uuidv4();
+    const sessionId = await this.sessionManagementService.createSession(user.id, ipAddress, userAgent);
     const tokens = await this.generateTokens(user.id, user.email, user.role, sessionId);
 
-    // Optimized batch update for login info
-    const sessionData = {
-      sessionId,
-      ipAddress,
-      userAgent,
-      email: user.email,
-      expiresAt: new Date(Date.now() + (rememberMe ? 30 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000)),
-    };
+    // Update user login info
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        failedLoginAttempts: 0,
+        lastFailedLoginAt: null,
+        lastLoginAt: new Date(),
+        loginCount: { increment: 1 },
+        sessionId,
+        ipAddress,
+        userAgent,
+      }
+    });
 
-    await this.queryOptimizationService.updateUserLoginBatch(user.id, sessionData);
+    // Log successful login
+    await this.prisma.loginHistory.create({
+      data: {
+        userId: user.id,
+        email: user.email,
+        success: true,
+        ipAddress,
+        userAgent,
+      }
+    });
+
+    // Handle security event
+    await this.sessionManagementService.handleSecurityEvent({
+      type: 'LOGIN',
+      userId: user.id,
+      ipAddress,
+      userAgent
+    });
 
     this.logger.log(`Successful login: ${user.email} (${user.role})`);
 
@@ -619,5 +771,6 @@ export class AuthService implements IAuthService {
       user: userData,
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken,
+      sessionId,
     };
   }

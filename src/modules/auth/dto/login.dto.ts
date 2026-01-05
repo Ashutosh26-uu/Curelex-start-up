@@ -51,6 +51,24 @@ export class PatientLoginDto {
   @MinLength(8, { message: 'Password must be at least 8 characters long' })
   @MaxLength(128, { message: 'Password must not exceed 128 characters' })
   password: string;
+
+  @ApiProperty({ required: false, example: 'ABC123', description: 'Captcha value for security verification' })
+  @IsOptional()
+  @IsString()
+  @MinLength(4)
+  @MaxLength(10)
+  captchaValue?: string;
+
+  @ApiProperty({ required: false, description: 'Captcha ID from captcha generation' })
+  @IsOptional()
+  @IsString()
+  captchaId?: string;
+
+  @ApiProperty({ required: false, example: '123456', description: 'Two-factor authentication code' })
+  @IsOptional()
+  @IsString()
+  @Matches(/^\d{6}$/, { message: '2FA token must be 6 digits' })
+  twoFactorToken?: string;
 }
 
 export class DoctorLoginDto {
@@ -65,4 +83,10 @@ export class DoctorLoginDto {
   @MinLength(8, { message: 'Password must be at least 8 characters long' })
   @MaxLength(128, { message: 'Password must not exceed 128 characters' })
   password: string;
+
+  @ApiProperty({ required: false, example: '123456', description: 'Two-factor authentication code' })
+  @IsOptional()
+  @IsString()
+  @Matches(/^\d{6}$/, { message: '2FA token must be 6 digits' })
+  twoFactorToken?: string;
 }
